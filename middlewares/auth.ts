@@ -68,6 +68,27 @@ export function requireAuthSessionOrApiToken(req: Request, res: Response, next: 
     .json(createErrorResponse("Authorization bearer token or x-api-token is required.", 401));
 }
 
+export function requireApiTokenAccess(req: Request, res: Response, next: NextFunction) {
+  if (req.apiTokenInvalid) {
+    res.status(401).json(createErrorResponse("Invalid x-api-token.", 401));
+    return;
+  }
+
+  if (!req.apiConsumer) {
+    res
+      .status(403)
+      .json(
+        createErrorResponse(
+          "The /crawl endpoint is only available for authenticated API token users.",
+          403,
+        ),
+      );
+    return;
+  }
+
+  next();
+}
+
 export function attachApiConsumer(req: Request, _res: Response, next: NextFunction) {
   const apiToken = req.header("x-api-token");
 

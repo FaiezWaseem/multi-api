@@ -159,6 +159,13 @@ const swaggerDefinition: OAS3Definition = {
         },
         required: ["name"],
       },
+      UpdateApiTokenRequest: {
+        type: "object",
+        properties: {
+          name: { type: "string", example: "Renamed token" },
+        },
+        required: ["name"],
+      },
       DuckDuckGoResult: {
         type: "object",
         properties: {
@@ -183,6 +190,18 @@ const swaggerDefinition: OAS3Definition = {
           },
         },
         required: ["query", "limit", "region", "responseType", "nextCursor", "count", "results"],
+      },
+      DuckDuckGoSearchContentData: {
+        type: "object",
+        properties: {
+          query: { type: "string", example: "openai" },
+          limit: { type: "integer", example: 10 },
+          region: { type: "string", nullable: true, example: "us-en" },
+          responseType: { type: "string", enum: ["html", "markdown", "txt"], example: "html" },
+          nextCursor: { type: "string", nullable: true, example: "eyJvZmZzZXQiOjEwfQ" },
+          content: { type: "string", example: "<html><body>...</body></html>" },
+        },
+        required: ["query", "limit", "region", "responseType", "nextCursor", "content"],
       },
       CrawlLink: {
         type: "object",
@@ -371,8 +390,8 @@ const swaggerDefinition: OAS3Definition = {
     "/log/searches": {
       get: {
         tags: ["Logs"],
-        summary: "List search logs for the logged-in user",
-        security: [{ bearerAuth: [] }],
+        summary: "List search logs for the authenticated user",
+        security: [{ bearerAuth: [] }, { apiTokenAuth: [] }],
         parameters: [
           {
             in: "query",
@@ -380,6 +399,14 @@ const swaggerDefinition: OAS3Definition = {
             required: false,
             schema: { type: "integer", default: 50, minimum: 1, maximum: 100 },
             description: "Maximum number of log entries to return.",
+          },
+          {
+            in: "header",
+            name: "x-api-token",
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Optional API token. You can authenticate with either Authorization: Bearer <sessionToken> or x-api-token.",
           },
         ],
         responses: {
@@ -405,7 +432,7 @@ const swaggerDefinition: OAS3Definition = {
             },
           },
           "401": {
-            description: "Missing or invalid bearer token.",
+            description: "Missing or invalid bearer token or x-api-token.",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
@@ -711,13 +738,7 @@ const swaggerDefinition: OAS3Definition = {
           required: true,
           content: {
             "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  name: { type: "string", example: "Renamed token" },
-                },
-                required: ["name"],
-              },
+              schema: { $ref: "#/components/schemas/UpdateApiTokenRequest" },
             },
           },
         },
@@ -835,7 +856,7 @@ const swaggerDefinition: OAS3Definition = {
             name: "response_type",
             required: false,
             schema: { type: "string", enum: ["json", "html", "markdown", "txt"], default: "json" },
-            description: "Response format.",
+            description: "Response format. json returns structured results. html, markdown, and txt return formatted content.",
           },
           {
             in: "header",
@@ -857,7 +878,12 @@ const swaggerDefinition: OAS3Definition = {
                     {
                       type: "object",
                       properties: {
-                        data: { $ref: "#/components/schemas/DuckDuckGoSearchData" },
+                        data: {
+                          oneOf: [
+                            { $ref: "#/components/schemas/DuckDuckGoSearchData" },
+                            { $ref: "#/components/schemas/DuckDuckGoSearchContentData" },
+                          ],
+                        },
                       },
                     },
                   ],
@@ -875,6 +901,14 @@ const swaggerDefinition: OAS3Definition = {
           },
           "401": {
             description: "Invalid x-api-token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "403": {
+            description: "The crawl endpoint is not available on the free tier and requires a valid x-api-token.",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
@@ -967,7 +1001,12 @@ const swaggerDefinition: OAS3Definition = {
                     {
                       type: "object",
                       properties: {
-                        data: { $ref: "#/components/schemas/DuckDuckGoSearchData" },
+                        data: {
+                          oneOf: [
+                            { $ref: "#/components/schemas/DuckDuckGoSearchData" },
+                            { $ref: "#/components/schemas/DuckDuckGoSearchContentData" },
+                          ],
+                        },
                       },
                     },
                   ],
@@ -992,7 +1031,7 @@ const swaggerDefinition: OAS3Definition = {
             },
           },
           "403": {
-            description: "Custom proxy requires a valid x-api-token.",
+            description: "The crawl endpoint is not available on the free tier, or custom proxy requires a valid x-api-token.",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
@@ -1046,7 +1085,7 @@ const swaggerDefinition: OAS3Definition = {
             name: "response_type",
             required: false,
             schema: { type: "string", enum: ["json", "html", "markdown", "txt"], default: "json" },
-            description: "Response format.",
+            description: "Response format. json returns structured crawl data. html, markdown, and txt return formatted content.",
           },
           {
             in: "query",

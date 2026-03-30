@@ -16,7 +16,7 @@ import { swaggerSpec } from "./docs/swagger";
 import { AppError } from "./lib/app-error";
 import { createErrorResponse } from "./lib/api-response";
 import "./lib/db";
-import { attachApiConsumer } from "./middlewares/auth";
+import { attachApiConsumer, requireApiTokenAccess } from "./middlewares/auth";
 import { searchRateLimiter } from "./middlewares/rate-limit";
 import { authRouter } from "./routes/auth.routes";
 import { logRouter } from "./routes/log.routes";
@@ -40,8 +40,8 @@ app.use("/auth", authRouter);
 app.use("/log", logRouter);
 app.use("/usage", usageRouter);
 
-app.get("/crawl", searchRateLimiter, getCrawlController);
-app.post("/crawl", searchRateLimiter, postCrawlController);
+app.get("/crawl", requireApiTokenAccess, searchRateLimiter, getCrawlController);
+app.post("/crawl", requireApiTokenAccess, searchRateLimiter, postCrawlController);
 app.get("/search/duckduckgo", searchRateLimiter, getDuckDuckGoSearchController);
 app.post("/search/duckduckgo", searchRateLimiter, postDuckDuckGoSearchController);
 
