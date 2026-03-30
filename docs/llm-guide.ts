@@ -50,6 +50,7 @@ Auth Endpoints
       "email": "user@example.com",
       "password": "supersecret123"
     }
+  - New non-admin users start with 150 credits by default
 - POST /auth/login
   - Body:
     {
@@ -211,4 +212,5 @@ Best Practices for LLM Clients
 - Use cursor for paginating search results
 - Use js_code carefully because it executes in the crawled page context
 - Treat proxy as an advanced token-only feature
+- Be aware that normal users receive a monthly credit allocation, currently 150 credits per calendar month
 `;

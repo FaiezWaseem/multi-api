@@ -6,7 +6,7 @@ const swaggerDefinition: OAS3Definition = {
     title: "DuckDuckGo Search API",
     version: "1.0.0",
     description:
-      "DuckDuckGo search API with SQLite-backed accounts, login sessions, API tokens, and tiered rate limits.",
+      "DuckDuckGo search API with SQLite-backed accounts, login sessions, API tokens, monthly user credits, and tiered rate limits.",
   },
   servers: [
     {
@@ -106,9 +106,10 @@ const swaggerDefinition: OAS3Definition = {
           email: { type: "string", example: "user@example.com" },
           isPaid: { type: "boolean", example: false },
           isAdmin: { type: "boolean", example: false },
+          credits: { type: "integer", example: 25 },
           createdAt: { type: "string", example: "2026-03-30T10:00:00.000Z" },
         },
-        required: ["id", "email", "isPaid", "isAdmin", "createdAt"],
+        required: ["id", "email", "isPaid", "isAdmin", "credits", "createdAt"],
       },
       LoginData: {
         type: "object",
@@ -420,9 +421,45 @@ const swaggerDefinition: OAS3Definition = {
           "created_at",
         ],
       },
+      CreditAdjustmentRequest: {
+        type: "object",
+        properties: {
+          amount: { type: "integer", example: 50 },
+          note: { type: "string", nullable: true, example: "Manual bonus credits" },
+        },
+        required: ["amount"],
+      },
+      CreditAdjustmentResult: {
+        type: "object",
+        properties: {
+          user: { $ref: "#/components/schemas/User" },
+          creditedAmount: { type: "integer", example: 50 },
+          balanceAfter: { type: "integer", example: 125 },
+          note: { type: "string", nullable: true, example: "Manual bonus credits" },
+        },
+        required: ["user", "creditedAmount", "balanceAfter", "note"],
+      },
     },
   },
   paths: {
+    "/admin/view": {
+      get: {
+        tags: ["Admin"],
+        summary: "Render the admin HTML console",
+        responses: {
+          "200": {
+            description: "Admin HTML console.",
+            content: {
+              "text/html": {
+                schema: {
+                  type: "string",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     "/admin/metrics": {
       get: {
         tags: ["Admin"],
@@ -457,6 +494,128 @@ const swaggerDefinition: OAS3Definition = {
           },
           "403": {
             description: "Admin access is required.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/admin/users": {
+      get: {
+        tags: ["Admin"],
+        summary: "List all registered users with credit balances",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Admin users fetched successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/User" },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Missing or invalid bearer token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "403": {
+            description: "Admin access is required.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/admin/users/{id}/credits": {
+      post: {
+        tags: ["Admin"],
+        summary: "Add credits to a user account",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string" },
+            description: "Target user id.",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreditAdjustmentRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Credits added successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/CreditAdjustmentResult" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid request data.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "401": {
+            description: "Missing or invalid bearer token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "403": {
+            description: "Admin access is required.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "404": {
+            description: "User not found.",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },

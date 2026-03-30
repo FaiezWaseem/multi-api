@@ -17,6 +17,8 @@ db.exec(`
     password_hash TEXT NOT NULL,
     is_paid INTEGER NOT NULL DEFAULT 0,
     is_admin INTEGER NOT NULL DEFAULT 0,
+    credits INTEGER NOT NULL DEFAULT 0,
+    monthly_credit_grant_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
@@ -86,6 +88,18 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
   );
 
+  CREATE TABLE IF NOT EXISTS credit_transactions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    admin_user_id TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    balance_after INTEGER NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
   CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   CREATE INDEX IF NOT EXISTS idx_auth_sessions_token_hash ON auth_sessions(token_hash);
   CREATE INDEX IF NOT EXISTS idx_api_tokens_token_hash ON api_tokens(token_hash);
@@ -94,6 +108,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_search_logs_user_id ON search_logs(user_id);
   CREATE INDEX IF NOT EXISTS idx_request_logs_created_at ON request_logs(created_at);
   CREATE INDEX IF NOT EXISTS idx_request_logs_user_id ON request_logs(user_id);
+  CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON credit_transactions(user_id);
 `);
 
 const apiTokensColumns = db
@@ -110,4 +125,12 @@ const userColumns = db
 
 if (!userColumns.some((column) => column.name === "is_admin")) {
   db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
+}
+
+if (!userColumns.some((column) => column.name === "credits")) {
+  db.exec("ALTER TABLE users ADD COLUMN credits INTEGER NOT NULL DEFAULT 0");
+}
+
+if (!userColumns.some((column) => column.name === "monthly_credit_grant_at")) {
+  db.exec("ALTER TABLE users ADD COLUMN monthly_credit_grant_at TEXT");
 }

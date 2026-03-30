@@ -16,6 +16,8 @@ type UserRecord = {
   password_hash: string;
   is_paid: number;
   is_admin: number;
+  credits: number;
+  monthly_credit_grant_at: string | null;
   created_at: string;
 };
 
@@ -43,12 +45,28 @@ type StoredApiTokenRecord = {
 };
 
 const sessionDurationMs = Number(process.env.AUTH_SESSION_TTL_MS ?? 7 * 24 * 60 * 60 * 1000);
+const monthlyCreditAmount = Number(process.env.DEFAULT_MONTHLY_CREDITS ?? 150);
 
 const insertUserStatement = db.query(
-  "INSERT INTO users (id, email, password_hash, is_paid, is_admin) VALUES (?, ?, ?, ?, ?)",
+  `INSERT INTO users (
+      id,
+      email,
+      password_hash,
+      is_paid,
+      is_admin,
+      credits,
+      monthly_credit_grant_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 );
 const findUserByEmailStatement = db.query(
-  "SELECT id, email, password_hash, is_paid, is_admin, created_at FROM users WHERE email = ?",
+  `SELECT id, email, password_hash, is_paid, is_admin, credits, monthly_credit_grant_at, created_at
+   FROM users
+   WHERE email = ?`,
+);
+const findUserByIdStatement = db.query(
+  `SELECT id, email, password_hash, is_paid, is_admin, credits, monthly_credit_grant_at, created_at
+   FROM users
+   WHERE id = ?`,
 );
 const insertSessionStatement = db.query(
   "INSERT INTO auth_sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)",
@@ -86,15 +104,44 @@ const updateApiTokenNameStatement = db.query(
 const revokeApiTokenStatement = db.query(
   "UPDATE api_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
 );
+const grantMonthlyCreditsStatement = db.query(
+  `UPDATE users
+   SET credits = credits + ?, monthly_credit_grant_at = ?, updated_at = CURRENT_TIMESTAMP
+   WHERE id = ?`,
+);
 
-function publicUser(user: Pick<UserRecord, "id" | "email" | "is_paid" | "is_admin" | "created_at">) {
+function publicUser(user: Pick<UserRecord, "id" | "email" | "is_paid" | "is_admin" | "credits" | "created_at">) {
   return {
     id: user.id,
     email: user.email,
     isPaid: Boolean(user.is_paid),
     isAdmin: Boolean(user.is_admin),
+    credits: user.credits,
     createdAt: user.created_at,
   };
+}
+
+function getMonthKey(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function shouldGrantMonthlyCredits(lastGrantedAt: string | null, now = new Date()) {
+  if (!lastGrantedAt) {
+    return true;
+  }
+
+  return getMonthKey(new Date(lastGrantedAt)) !== getMonthKey(now);
+}
+
+function refreshMonthlyCreditsIfNeeded(user: UserRecord) {
+  if (!shouldGrantMonthlyCredits(user.monthly_credit_grant_at)) {
+    return user;
+  }
+
+  const grantedAt = new Date().toISOString();
+  grantMonthlyCreditsStatement.run(monthlyCreditAmount, grantedAt, user.id);
+
+  return findUserByIdStatement.get(user.id) as UserRecord;
 }
 
 export async function registerUser(email: string, password: string) {
@@ -106,8 +153,9 @@ export async function registerUser(email: string, password: string) {
 
   const userId = generateId();
   const passwordHash = await hashPassword(password);
+  const grantedAt = new Date().toISOString();
 
-  insertUserStatement.run(userId, email, passwordHash, 0, 0);
+  insertUserStatement.run(userId, email, passwordHash, 0, 0, monthlyCreditAmount, grantedAt);
 
   const createdUser = findUserByEmailStatement.get(email) as UserRecord;
 
@@ -122,7 +170,7 @@ export async function loginUser(
     userAgent?: string | null;
   },
 ) {
-  const user = findUserByEmailStatement.get(email) as UserRecord | null;
+  let user = findUserByEmailStatement.get(email) as UserRecord | null;
 
   if (!user) {
     throw new AppError("Invalid email or password.", 401);
@@ -133,6 +181,8 @@ export async function loginUser(
   if (!passwordMatches) {
     throw new AppError("Invalid email or password.", 401);
   }
+
+  user = refreshMonthlyCreditsIfNeeded(user);
 
   deleteExpiredSessionsStatement.run(new Date().toISOString());
 
@@ -167,11 +217,13 @@ export function getUserFromSessionToken(sessionToken: string) {
     return null;
   }
 
+  const user = refreshMonthlyCreditsIfNeeded(findUserByIdStatement.get(session.user_id) as UserRecord);
+
   return {
     id: session.user_id,
-    email: session.email,
-    isPaid: Boolean(session.is_paid),
-    isAdmin: Boolean(session.is_admin),
+    email: user.email,
+    isPaid: Boolean(user.is_paid),
+    isAdmin: Boolean(user.is_admin),
   };
 }
 
@@ -242,13 +294,14 @@ export function getApiConsumerFromToken(apiToken: string) {
   }
 
   touchApiTokenStatement.run(tokenRecord.token_id);
+  const user = refreshMonthlyCreditsIfNeeded(findUserByIdStatement.get(tokenRecord.user_id) as UserRecord);
 
   return {
     id: tokenRecord.user_id,
-    email: tokenRecord.email,
+    email: user.email,
     tokenId: tokenRecord.token_id,
-    tier: tokenRecord.is_paid ? "paid" : "auth",
-    isAdmin: Boolean(tokenRecord.is_admin),
+    tier: user.is_paid ? "paid" : "auth",
+    isAdmin: Boolean(user.is_admin),
   } as const;
 }
 
@@ -268,5 +321,5 @@ export async function ensureDefaultAdminUser() {
   const userId = generateId();
   const passwordHash = await hashPassword(adminPassword);
 
-  insertUserStatement.run(userId, adminEmail, passwordHash, 1, 1);
+  insertUserStatement.run(userId, adminEmail, passwordHash, 1, 1, 0, null);
 }
