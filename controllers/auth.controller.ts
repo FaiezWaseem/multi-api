@@ -27,7 +27,10 @@ export async function registerController(req: Request, res: Response, next: Next
 export async function loginController(req: Request, res: Response, next: NextFunction) {
   try {
     const { email, password } = loginSchema.parse(req.body);
-    const session = await loginUser(email, password);
+    const session = await loginUser(email, password, {
+      ipAddress: req.ip,
+      userAgent: req.header("user-agent") ?? null,
+    });
 
     res.status(200).json(createSuccessResponse("Login successful", session));
   } catch (error) {

@@ -8,6 +8,7 @@ import {
   hashToken,
   verifyPassword,
 } from "../lib/auth";
+import { createLoginLog } from "./log.service";
 
 type UserRecord = {
   id: string;
@@ -92,7 +93,14 @@ export async function registerUser(email: string, password: string) {
   return publicUser(createdUser);
 }
 
-export async function loginUser(email: string, password: string) {
+export async function loginUser(
+  email: string,
+  password: string,
+  metadata?: {
+    ipAddress?: string | null;
+    userAgent?: string | null;
+  },
+) {
   const user = findUserByEmailStatement.get(email) as UserRecord | null;
 
   if (!user) {
@@ -113,6 +121,12 @@ export async function loginUser(email: string, password: string) {
   const expiresAt = new Date(Date.now() + sessionDurationMs).toISOString();
 
   insertSessionStatement.run(sessionId, user.id, sessionTokenHash, expiresAt);
+  createLoginLog({
+    userId: user.id,
+    email: user.email,
+    ipAddress: metadata?.ipAddress,
+    userAgent: metadata?.userAgent,
+  });
 
   return {
     sessionToken,

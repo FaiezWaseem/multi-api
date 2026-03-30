@@ -27,6 +27,10 @@ const swaggerDefinition: OAS3Definition = {
       name: "Usage",
       description: "Inspect current rate-limit tier and remaining usage.",
     },
+    {
+      name: "Logs",
+      description: "Review login and search activity for the authenticated user.",
+    },
   ],
   components: {
     securitySchemes: {
@@ -248,9 +252,142 @@ const swaggerDefinition: OAS3Definition = {
         },
         required: ["tier", "identity", "authenticated", "limits", "usage"],
       },
+      LoginLog: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          user_id: { type: "string" },
+          email: { type: "string", example: "user@example.com" },
+          ip_address: { type: "string", nullable: true, example: "::1" },
+          user_agent: { type: "string", nullable: true, example: "Mozilla/5.0" },
+          created_at: { type: "string", example: "2026-03-30 12:00:00" },
+        },
+        required: ["id", "user_id", "email", "ip_address", "user_agent", "created_at"],
+      },
+      SearchLog: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          user_id: { type: "string" },
+          api_token_id: { type: "string", nullable: true },
+          query: { type: "string", example: "openai" },
+          region: { type: "string", nullable: true, example: "us-en" },
+          result_count: { type: "integer", example: 1 },
+          requested_limit: { type: "integer", example: 10 },
+          ip_address: { type: "string", nullable: true, example: "::1" },
+          user_agent: { type: "string", nullable: true, example: "Mozilla/5.0" },
+          created_at: { type: "string", example: "2026-03-30 12:10:00" },
+        },
+        required: [
+          "id",
+          "user_id",
+          "api_token_id",
+          "query",
+          "region",
+          "result_count",
+          "requested_limit",
+          "ip_address",
+          "user_agent",
+          "created_at",
+        ],
+      },
     },
   },
   paths: {
+    "/log/searches": {
+      get: {
+        tags: ["Logs"],
+        summary: "List search logs for the logged-in user",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "limit",
+            required: false,
+            schema: { type: "integer", default: 50, minimum: 1, maximum: 100 },
+            description: "Maximum number of log entries to return.",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Search logs fetched successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/SearchLog" },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Missing or invalid bearer token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/log/logins": {
+      get: {
+        tags: ["Logs"],
+        summary: "List login logs for the logged-in user",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "limit",
+            required: false,
+            schema: { type: "integer", default: 50, minimum: 1, maximum: 100 },
+            description: "Maximum number of log entries to return.",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Login logs fetched successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/LoginLog" },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Missing or invalid bearer token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/usage": {
       get: {
         tags: ["Usage"],

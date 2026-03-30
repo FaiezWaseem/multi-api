@@ -15,6 +15,7 @@ import "./lib/db";
 import { attachApiConsumer } from "./middlewares/auth";
 import { searchRateLimiter } from "./middlewares/rate-limit";
 import { authRouter } from "./routes/auth.routes";
+import { logRouter } from "./routes/log.routes";
 import { usageRouter } from "./routes/usage.routes";
 
 dotenv.config();
@@ -32,6 +33,7 @@ app.get("/openapi.json", (_req: Request, res: Response) => {
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/auth", authRouter);
+app.use("/log", logRouter);
 app.use("/usage", usageRouter);
 
 app.get("/search/duckduckgo", searchRateLimiter, getDuckDuckGoSearchController);

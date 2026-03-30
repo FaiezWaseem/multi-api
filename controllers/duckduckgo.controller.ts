@@ -14,7 +14,12 @@ export async function getDuckDuckGoSearchController(
 ) {
   try {
     const { query, limit, region } = getDuckDuckGoSearchSchema.parse(req.query);
-    const payload = await getDuckDuckGoSearchResults(query, limit, region);
+    const payload = await getDuckDuckGoSearchResults(query, limit, region, {
+      userId: req.apiConsumer?.id,
+      apiTokenId: req.apiConsumer?.tokenId,
+      ipAddress: req.ip,
+      userAgent: req.header("user-agent") ?? null,
+    });
 
     res.status(200).json(createSuccessResponse("DuckDuckGo search completed successfully", payload));
   } catch (error) {
@@ -33,7 +38,12 @@ export async function postDuckDuckGoSearchController(
       limit: req.body?.limit ?? req.query.limit,
       region: req.body?.region ?? req.query.region,
     });
-    const payload = await getDuckDuckGoSearchResults(query, limit, region);
+    const payload = await getDuckDuckGoSearchResults(query, limit, region, {
+      userId: req.apiConsumer?.id,
+      apiTokenId: req.apiConsumer?.tokenId,
+      ipAddress: req.ip,
+      userAgent: req.header("user-agent") ?? null,
+    });
 
     res.status(200).json(createSuccessResponse("DuckDuckGo search completed successfully", payload));
   } catch (error) {
