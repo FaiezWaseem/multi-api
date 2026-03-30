@@ -1,5 +1,5 @@
 import cors from "cors";
-import dotenv from "dotenv";
+import "dotenv/config";
 import express, { type NextFunction, type Request, type Response } from "express";
 import swaggerUi from "swagger-ui-express";
 import { z } from "zod";
@@ -17,13 +17,15 @@ import { swaggerSpec } from "./docs/swagger";
 import { AppError } from "./lib/app-error";
 import { createErrorResponse } from "./lib/api-response";
 import "./lib/db";
+import { ensureDefaultAdminUser } from "./services/auth.service";
+import { requestLogMiddleware } from "./middlewares/request-log";
 import { attachApiConsumer, requireApiTokenAccess } from "./middlewares/auth";
 import { searchRateLimiter } from "./middlewares/rate-limit";
+import { adminRouter } from "./routes/admin.routes";
 import { authRouter } from "./routes/auth.routes";
 import { logRouter } from "./routes/log.routes";
 import { usageRouter } from "./routes/usage.routes";
-
-dotenv.config();
+await ensureDefaultAdminUser();
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
@@ -31,6 +33,7 @@ const port = Number(process.env.PORT ?? 3000);
 app.use(cors());
 app.use(express.json());
 app.use(attachApiConsumer);
+app.use(requestLogMiddleware);
 
 app.get("/openapi.json", (_req: Request, res: Response) => {
   res.json(swaggerSpec);
@@ -41,6 +44,7 @@ app.get("/llm.txt", (_req: Request, res: Response) => {
 });
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use("/admin", adminRouter);
 app.use("/auth", authRouter);
 app.use("/log", logRouter);
 app.use("/usage", usageRouter);

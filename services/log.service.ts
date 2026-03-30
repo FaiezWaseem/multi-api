@@ -31,6 +31,33 @@ const listSearchLogsStatement = db.query(
    ORDER BY created_at DESC
    LIMIT ?`,
 );
+const insertRequestLogStatement = db.query(
+  `INSERT INTO request_logs (
+      id,
+      user_id,
+      method,
+      endpoint,
+      status_code,
+      ip_address,
+      user_agent
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+);
+const listRequestLogsStatement = db.query(
+  `SELECT id, user_id, method, endpoint, status_code, ip_address, user_agent, created_at
+   FROM request_logs
+   ORDER BY created_at DESC
+   LIMIT ?`,
+);
+const getDailyRequestCountStatement = db.query(
+  `SELECT COUNT(*) as count
+   FROM request_logs
+   WHERE date(created_at) = date('now')`,
+);
+const getMonthlyRequestCountStatement = db.query(
+  `SELECT COUNT(*) as count
+   FROM request_logs
+   WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')`,
+);
 
 export function createLoginLog(input: {
   userId: string;
@@ -70,10 +97,43 @@ export function createSearchLog(input: {
   );
 }
 
+export function createRequestLog(input: {
+  userId?: string | null;
+  method: string;
+  endpoint: string;
+  statusCode: number;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}) {
+  insertRequestLogStatement.run(
+    generateId(),
+    input.userId ?? null,
+    input.method,
+    input.endpoint,
+    input.statusCode,
+    input.ipAddress ?? null,
+    input.userAgent ?? null,
+  );
+}
+
 export function listLoginLogsForUser(userId: string, limit = 50) {
   return listLoginLogsStatement.all(userId, limit);
 }
 
 export function listSearchLogsForUser(userId: string, limit = 50) {
   return listSearchLogsStatement.all(userId, limit);
+}
+
+export function listRequestLogs(limit = 100) {
+  return listRequestLogsStatement.all(limit);
+}
+
+export function getSystemRequestMetrics() {
+  const daily = getDailyRequestCountStatement.get() as { count: number } | null;
+  const monthly = getMonthlyRequestCountStatement.get() as { count: number } | null;
+
+  return {
+    dailyRequests: daily?.count ?? 0,
+    monthlyRequests: monthly?.count ?? 0,
+  };
 }

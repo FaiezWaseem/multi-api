@@ -15,6 +15,7 @@ type UserRecord = {
   email: string;
   password_hash: string;
   is_paid: number;
+  is_admin: number;
   created_at: string;
 };
 
@@ -29,6 +30,7 @@ type ApiTokenLookup = {
   user_id: string;
   email: string;
   is_paid: number;
+  is_admin: number;
 };
 
 type StoredApiTokenRecord = {
@@ -43,16 +45,16 @@ type StoredApiTokenRecord = {
 const sessionDurationMs = Number(process.env.AUTH_SESSION_TTL_MS ?? 7 * 24 * 60 * 60 * 1000);
 
 const insertUserStatement = db.query(
-  "INSERT INTO users (id, email, password_hash, is_paid) VALUES (?, ?, ?, ?)",
+  "INSERT INTO users (id, email, password_hash, is_paid, is_admin) VALUES (?, ?, ?, ?, ?)",
 );
 const findUserByEmailStatement = db.query(
-  "SELECT id, email, password_hash, is_paid, created_at FROM users WHERE email = ?",
+  "SELECT id, email, password_hash, is_paid, is_admin, created_at FROM users WHERE email = ?",
 );
 const insertSessionStatement = db.query(
   "INSERT INTO auth_sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)",
 );
 const findSessionByHashStatement = db.query(
-  `SELECT auth_sessions.id, auth_sessions.user_id, auth_sessions.expires_at, users.email, users.is_paid
+  `SELECT auth_sessions.id, auth_sessions.user_id, auth_sessions.expires_at, users.email, users.is_paid, users.is_admin
    FROM auth_sessions
    JOIN users ON users.id = auth_sessions.user_id
    WHERE auth_sessions.token_hash = ?`,
@@ -64,7 +66,7 @@ const insertApiTokenStatement = db.query(
   "INSERT INTO api_tokens (id, user_id, name, token_prefix, token_hash) VALUES (?, ?, ?, ?, ?)",
 );
 const findApiTokenByHashStatement = db.query(
-  `SELECT api_tokens.id AS token_id, users.id AS user_id, users.email, users.is_paid
+  `SELECT api_tokens.id AS token_id, users.id AS user_id, users.email, users.is_paid, users.is_admin
    FROM api_tokens
    JOIN users ON users.id = api_tokens.user_id
    WHERE api_tokens.token_hash = ? AND api_tokens.revoked_at IS NULL`,
@@ -85,11 +87,12 @@ const revokeApiTokenStatement = db.query(
   "UPDATE api_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
 );
 
-function publicUser(user: Pick<UserRecord, "id" | "email" | "is_paid" | "created_at">) {
+function publicUser(user: Pick<UserRecord, "id" | "email" | "is_paid" | "is_admin" | "created_at">) {
   return {
     id: user.id,
     email: user.email,
     isPaid: Boolean(user.is_paid),
+    isAdmin: Boolean(user.is_admin),
     createdAt: user.created_at,
   };
 }
@@ -104,7 +107,7 @@ export async function registerUser(email: string, password: string) {
   const userId = generateId();
   const passwordHash = await hashPassword(password);
 
-  insertUserStatement.run(userId, email, passwordHash, 0);
+  insertUserStatement.run(userId, email, passwordHash, 0, 0);
 
   const createdUser = findUserByEmailStatement.get(email) as UserRecord;
 
@@ -157,7 +160,7 @@ export function getUserFromSessionToken(sessionToken: string) {
   deleteExpiredSessionsStatement.run(new Date().toISOString());
 
   const session = findSessionByHashStatement.get(hashToken(sessionToken)) as
-    | (SessionRecord & { email: string; is_paid: number })
+    | (SessionRecord & { email: string; is_paid: number; is_admin: number })
     | null;
 
   if (!session) {
@@ -168,6 +171,7 @@ export function getUserFromSessionToken(sessionToken: string) {
     id: session.user_id,
     email: session.email,
     isPaid: Boolean(session.is_paid),
+    isAdmin: Boolean(session.is_admin),
   };
 }
 
@@ -244,5 +248,25 @@ export function getApiConsumerFromToken(apiToken: string) {
     email: tokenRecord.email,
     tokenId: tokenRecord.token_id,
     tier: tokenRecord.is_paid ? "paid" : "auth",
+    isAdmin: Boolean(tokenRecord.is_admin),
   } as const;
+}
+
+export async function ensureDefaultAdminUser() {
+  const adminEmail = (process.env.DEFAULT_ADMIN_EMAIL ?? "admin@local.dev").trim().toLowerCase();
+  const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD ?? "admin123456";
+
+  const existingAdmin = findUserByEmailStatement.get(adminEmail) as UserRecord | null;
+
+  if (existingAdmin) {
+    if (!existingAdmin.is_admin) {
+      db.query("UPDATE users SET is_admin = 1, is_paid = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(existingAdmin.id);
+    }
+    return;
+  }
+
+  const userId = generateId();
+  const passwordHash = await hashPassword(adminPassword);
+
+  insertUserStatement.run(userId, adminEmail, passwordHash, 1, 1);
 }

@@ -16,6 +16,7 @@ db.exec(`
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     is_paid INTEGER NOT NULL DEFAULT 0,
+    is_admin INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
@@ -73,12 +74,26 @@ db.exec(`
     FOREIGN KEY (api_token_id) REFERENCES api_tokens(id) ON DELETE SET NULL
   );
 
+  CREATE TABLE IF NOT EXISTS request_logs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    method TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    status_code INTEGER NOT NULL,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   CREATE INDEX IF NOT EXISTS idx_auth_sessions_token_hash ON auth_sessions(token_hash);
   CREATE INDEX IF NOT EXISTS idx_api_tokens_token_hash ON api_tokens(token_hash);
   CREATE INDEX IF NOT EXISTS idx_search_cache_expires_at ON search_cache(expires_at);
   CREATE INDEX IF NOT EXISTS idx_login_logs_user_id ON login_logs(user_id);
   CREATE INDEX IF NOT EXISTS idx_search_logs_user_id ON search_logs(user_id);
+  CREATE INDEX IF NOT EXISTS idx_request_logs_created_at ON request_logs(created_at);
+  CREATE INDEX IF NOT EXISTS idx_request_logs_user_id ON request_logs(user_id);
 `);
 
 const apiTokensColumns = db
@@ -87,4 +102,12 @@ const apiTokensColumns = db
 
 if (!apiTokensColumns.some((column) => column.name === "revoked_at")) {
   db.exec("ALTER TABLE api_tokens ADD COLUMN revoked_at TEXT");
+}
+
+const userColumns = db
+  .query("PRAGMA table_info(users)")
+  .all() as Array<{ name: string }>;
+
+if (!userColumns.some((column) => column.name === "is_admin")) {
+  db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
 }

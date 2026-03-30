@@ -7,12 +7,14 @@ declare global {
         id: string;
         email: string;
         isPaid: boolean;
+        isAdmin: boolean;
       };
       apiConsumer?: {
         id: string;
         email: string;
         tier: "free" | "auth" | "paid";
         tokenId: string;
+        isAdmin: boolean;
       };
       apiTokenInvalid?: boolean;
     }

@@ -58,6 +58,7 @@ export function requireAuthSessionOrApiToken(req: Request, res: Response, next: 
       id: req.apiConsumer.id,
       email: req.apiConsumer.email,
       isPaid: req.apiConsumer.tier === "paid",
+      isAdmin: req.apiConsumer.isAdmin,
     };
     next();
     return;

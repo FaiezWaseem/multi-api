@@ -35,6 +35,10 @@ const swaggerDefinition: OAS3Definition = {
       name: "Logs",
       description: "Review login and search activity for the authenticated user.",
     },
+    {
+      name: "Admin",
+      description: "Admin-only system metrics and request logs.",
+    },
   ],
   components: {
     securitySchemes: {
@@ -101,9 +105,10 @@ const swaggerDefinition: OAS3Definition = {
           id: { type: "string", example: "f6f66cf1-7e87-4b8a-b9d0-a6ce3f1b1111" },
           email: { type: "string", example: "user@example.com" },
           isPaid: { type: "boolean", example: false },
+          isAdmin: { type: "boolean", example: false },
           createdAt: { type: "string", example: "2026-03-30T10:00:00.000Z" },
         },
-        required: ["id", "email", "isPaid", "createdAt"],
+        required: ["id", "email", "isPaid", "isAdmin", "createdAt"],
       },
       LoginData: {
         type: "object",
@@ -384,9 +389,138 @@ const swaggerDefinition: OAS3Definition = {
           "created_at",
         ],
       },
+      AdminMetrics: {
+        type: "object",
+        properties: {
+          dailyRequests: { type: "integer", example: 128 },
+          monthlyRequests: { type: "integer", example: 2417 },
+        },
+        required: ["dailyRequests", "monthlyRequests"],
+      },
+      RequestLog: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          user_id: { type: "string", nullable: true },
+          method: { type: "string", example: "GET" },
+          endpoint: { type: "string", example: "/crawl" },
+          status_code: { type: "integer", example: 200 },
+          ip_address: { type: "string", nullable: true, example: "203.0.113.10" },
+          user_agent: { type: "string", nullable: true, example: "Mozilla/5.0" },
+          created_at: { type: "string", example: "2026-03-30 12:10:00" },
+        },
+        required: [
+          "id",
+          "user_id",
+          "method",
+          "endpoint",
+          "status_code",
+          "ip_address",
+          "user_agent",
+          "created_at",
+        ],
+      },
     },
   },
   paths: {
+    "/admin/metrics": {
+      get: {
+        tags: ["Admin"],
+        summary: "Get system-wide request metrics",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Admin metrics fetched successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/AdminMetrics" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Missing or invalid bearer token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "403": {
+            description: "Admin access is required.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/admin/requests": {
+      get: {
+        tags: ["Admin"],
+        summary: "List recent system request logs",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "limit",
+            required: false,
+            schema: { type: "integer", default: 100, minimum: 1, maximum: 500 },
+            description: "Maximum number of request log entries to return.",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Admin request logs fetched successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/RequestLog" },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Missing or invalid bearer token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "403": {
+            description: "Admin access is required.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/log/searches": {
       get: {
         tags: ["Logs"],
