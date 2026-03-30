@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun --watch index.ts",
     "start": "bun index.ts",
-    "build": "bun build ./index.ts --target=node --format=esm --outdir ./dist --external puppeteer",
+    "build": "bun build ./index.ts --target=bun --format=esm --outdir ./dist --external puppeteer",
     "start:prod": "bun dist/index.js"
   },
   "devDependencies": {
