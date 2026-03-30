@@ -24,16 +24,16 @@ const minuteWindowMs = 60 * 1000;
 const dayWindowMs = 24 * 60 * 60 * 1000;
 const tierLimits: Record<AccountTier, TierLimit> = {
   free: {
-    perMinute: 2,
-    perDay: 25,
+    perMinute: 5,
+    perDay: 10,
   },
   auth: {
-    perMinute: 20,
-    perDay: 100,
+    perMinute: 10,
+    perDay: 50,
   },
   paid: {
-    perMinute: 100,
-    perDay: 1000,
+    perMinute: 30,
+    perDay: 3000,
   },
 };
 
