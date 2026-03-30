@@ -5,6 +5,10 @@ import swaggerUi from "swagger-ui-express";
 import { z } from "zod";
 
 import {
+  getCrawlController,
+  postCrawlController,
+} from "./controllers/crawl.controller";
+import {
   getDuckDuckGoSearchController,
   postDuckDuckGoSearchController,
 } from "./controllers/duckduckgo.controller";
@@ -36,6 +40,8 @@ app.use("/auth", authRouter);
 app.use("/log", logRouter);
 app.use("/usage", usageRouter);
 
+app.get("/crawl", searchRateLimiter, getCrawlController);
+app.post("/crawl", searchRateLimiter, postCrawlController);
 app.get("/search/duckduckgo", searchRateLimiter, getDuckDuckGoSearchController);
 app.post("/search/duckduckgo", searchRateLimiter, postDuckDuckGoSearchController);
 

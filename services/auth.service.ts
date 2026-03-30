@@ -31,6 +31,15 @@ type ApiTokenLookup = {
   is_paid: number;
 };
 
+type StoredApiTokenRecord = {
+  id: string;
+  name: string;
+  token_prefix: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+};
+
 const sessionDurationMs = Number(process.env.AUTH_SESSION_TTL_MS ?? 7 * 24 * 60 * 60 * 1000);
 
 const insertUserStatement = db.query(
@@ -58,13 +67,22 @@ const findApiTokenByHashStatement = db.query(
   `SELECT api_tokens.id AS token_id, users.id AS user_id, users.email, users.is_paid
    FROM api_tokens
    JOIN users ON users.id = api_tokens.user_id
-   WHERE api_tokens.token_hash = ?`,
+   WHERE api_tokens.token_hash = ? AND api_tokens.revoked_at IS NULL`,
 );
 const touchApiTokenStatement = db.query(
   "UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?",
 );
 const listApiTokensStatement = db.query(
-  "SELECT id, name, token_prefix, last_used_at, created_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC",
+  "SELECT id, name, token_prefix, last_used_at, revoked_at, created_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC",
+);
+const findApiTokenByIdStatement = db.query(
+  "SELECT id, name, token_prefix, last_used_at, revoked_at, created_at FROM api_tokens WHERE id = ? AND user_id = ?",
+);
+const updateApiTokenNameStatement = db.query(
+  "UPDATE api_tokens SET name = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
+);
+const revokeApiTokenStatement = db.query(
+  "UPDATE api_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
 );
 
 function publicUser(user: Pick<UserRecord, "id" | "email" | "is_paid" | "created_at">) {
@@ -175,6 +193,41 @@ export function createApiTokenForUser(userId: string, name: string) {
 
 export function listApiTokensForUser(userId: string) {
   return listApiTokensStatement.all(userId);
+}
+
+export function renameApiTokenForUser(userId: string, tokenId: string, name: string) {
+  const existingToken = findApiTokenByIdStatement.get(tokenId, userId) as StoredApiTokenRecord | null;
+
+  if (!existingToken) {
+    throw new AppError("API token not found.", 404);
+  }
+
+  if (existingToken.revoked_at) {
+    throw new AppError("API token has already been revoked.", 400);
+  }
+
+  updateApiTokenNameStatement.run(name, tokenId, userId);
+
+  return findApiTokenByIdStatement.get(tokenId, userId);
+}
+
+export function revokeApiTokenForUser(userId: string, tokenId: string) {
+  const existingToken = findApiTokenByIdStatement.get(tokenId, userId) as StoredApiTokenRecord | null;
+
+  if (!existingToken) {
+    throw new AppError("API token not found.", 404);
+  }
+
+  if (existingToken.revoked_at) {
+    throw new AppError("API token has already been revoked.", 400);
+  }
+
+  revokeApiTokenStatement.run(tokenId, userId);
+
+  return {
+    id: tokenId,
+    revoked: true,
+  };
 }
 
 export function getApiConsumerFromToken(apiToken: string) {

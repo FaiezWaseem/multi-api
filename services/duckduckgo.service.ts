@@ -1,5 +1,38 @@
 import { type SearchResponseType, searchDuckDuckGo } from "../lib/duckduckgo";
+import { AppError } from "../lib/app-error";
+import { createSearchCacheKey, getCachedPayload, setCachedPayload } from "../lib/cache";
+import type { ProxyConfig } from "../lib/proxy";
 import { createSearchLog } from "./log.service";
+
+const rawSearchResultWindow = 50;
+
+function encodeOffsetCursor(nextOffset: number) {
+  return Buffer.from(JSON.stringify({ offset: nextOffset }), "utf8").toString("base64url");
+}
+
+function decodeOffsetCursor(cursor?: string) {
+  if (!cursor) {
+    return 0;
+  }
+
+  try {
+    const decoded = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
+      offset: number;
+    };
+
+    if (
+      typeof decoded.offset !== "number" ||
+      !Number.isFinite(decoded.offset) ||
+      decoded.offset < 0
+    ) {
+      throw new Error("Invalid cursor");
+    }
+
+    return decoded.offset;
+  } catch {
+    throw new AppError("Invalid cursor.", 400);
+  }
+}
 
 function toMarkdown(results: Awaited<ReturnType<typeof searchDuckDuckGo>>["results"]) {
   return results
@@ -24,6 +57,8 @@ export async function getDuckDuckGoSearchResults(
   limit: number,
   region?: string,
   responseType: SearchResponseType = "json",
+  cursor?: string,
+  proxy?: ProxyConfig,
   metadata?: {
     userId?: string;
     apiTokenId?: string;
@@ -31,8 +66,38 @@ export async function getDuckDuckGoSearchResults(
     userAgent?: string | null;
   },
 ) {
-  const searchPayload = await searchDuckDuckGo(query, limit, region);
-  const { results, html } = searchPayload;
+  const offset = decodeOffsetCursor(cursor);
+  const cacheEnabled = !proxy;
+  const rawCacheKey = createSearchCacheKey({
+    version: 4,
+    query,
+    region: region ?? null,
+    window: Math.max(rawSearchResultWindow, offset + limit),
+  });
+
+  let rawPayload = cacheEnabled
+    ? getCachedPayload<Awaited<ReturnType<typeof searchDuckDuckGo>>>(rawCacheKey)
+    : null;
+
+  if (!rawPayload || rawPayload.results.length < offset + limit) {
+    rawPayload = await searchDuckDuckGo(
+      query,
+      Math.max(rawSearchResultWindow, offset + limit),
+      region,
+      undefined,
+      proxy,
+    );
+
+    if (cacheEnabled) {
+      setCachedPayload(rawCacheKey, rawPayload);
+    }
+  }
+
+  const pageResults = rawPayload.results.slice(offset, offset + limit);
+  const nextCursor =
+    rawPayload.results.length > offset + pageResults.length && pageResults.length > 0
+      ? encodeOffsetCursor(offset + pageResults.length)
+      : null;
 
   if (metadata?.userId) {
     createSearchLog({
@@ -40,7 +105,7 @@ export async function getDuckDuckGoSearchResults(
       apiTokenId: metadata.apiTokenId,
       query,
       region,
-      resultCount: results.length,
+      resultCount: pageResults.length,
       requestedLimit: limit,
       ipAddress: metadata.ipAddress,
       userAgent: metadata.userAgent,
@@ -53,7 +118,8 @@ export async function getDuckDuckGoSearchResults(
       limit,
       region: region ?? null,
       responseType,
-      content: html,
+      nextCursor,
+      content: rawPayload.html,
     };
   }
 
@@ -63,7 +129,8 @@ export async function getDuckDuckGoSearchResults(
       limit,
       region: region ?? null,
       responseType,
-      content: toMarkdown(results),
+      nextCursor,
+      content: toMarkdown(pageResults),
     };
   }
 
@@ -73,7 +140,8 @@ export async function getDuckDuckGoSearchResults(
       limit,
       region: region ?? null,
       responseType,
-      content: toText(results),
+      nextCursor,
+      content: toText(pageResults),
     };
   }
 
@@ -82,7 +150,8 @@ export async function getDuckDuckGoSearchResults(
     limit,
     region: region ?? null,
     responseType,
-    count: results.length,
-    results,
+    nextCursor,
+    count: pageResults.length,
+    results: pageResults,
   };
 }

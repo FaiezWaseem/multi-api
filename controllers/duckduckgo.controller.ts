@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 
 import { createSuccessResponse } from "../lib/api-response";
+import { AppError } from "../lib/app-error";
 import { getDuckDuckGoSearchResults } from "../services/duckduckgo.service";
 import {
   getDuckDuckGoSearchSchema,
@@ -13,8 +14,8 @@ export async function getDuckDuckGoSearchController(
   next: NextFunction,
 ) {
   try {
-    const { query, limit, region, response_type } = getDuckDuckGoSearchSchema.parse(req.query);
-    const payload = await getDuckDuckGoSearchResults(query, limit, region, response_type, {
+    const { query, limit, region, response_type, cursor } = getDuckDuckGoSearchSchema.parse(req.query);
+    const payload = await getDuckDuckGoSearchResults(query, limit, region, response_type, cursor, undefined, {
       userId: req.apiConsumer?.id,
       apiTokenId: req.apiConsumer?.tokenId,
       ipAddress: req.ip,
@@ -33,13 +34,19 @@ export async function postDuckDuckGoSearchController(
   next: NextFunction,
 ) {
   try {
-    const { query, limit, region, response_type } = postDuckDuckGoSearchSchema.parse({
+    const { query, limit, region, response_type, cursor, proxy } = postDuckDuckGoSearchSchema.parse({
       ...req.body,
       limit: req.body?.limit ?? req.query.limit,
       region: req.body?.region ?? req.query.region,
       response_type: req.body?.response_type ?? req.query.response_type,
+      cursor: req.body?.cursor ?? req.query.cursor,
     });
-    const payload = await getDuckDuckGoSearchResults(query, limit, region, response_type, {
+
+    if (proxy && !req.apiConsumer) {
+      throw new AppError("Custom proxy is only available for authenticated x-api-token requests.", 403);
+    }
+
+    const payload = await getDuckDuckGoSearchResults(query, limit, region, response_type, cursor, proxy, {
       userId: req.apiConsumer?.id,
       apiTokenId: req.apiConsumer?.tokenId,
       ipAddress: req.ip,

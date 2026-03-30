@@ -13,3 +13,11 @@ export const loginSchema = z.object({
 export const createApiTokenSchema = z.object({
   name: z.string().trim().min(1, "name is required").max(100),
 });
+
+export const updateApiTokenSchema = z.object({
+  name: z.string().trim().min(1, "name is required").max(100),
+});
+
+export const apiTokenIdParamSchema = z.object({
+  id: z.string().trim().min(1, "token id is required"),
+});

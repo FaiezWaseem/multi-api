@@ -24,6 +24,10 @@ const swaggerDefinition: OAS3Definition = {
       description: "Search DuckDuckGo with GET or POST requests.",
     },
     {
+      name: "Crawl",
+      description: "Fetch and optionally execute JavaScript on any page URL.",
+    },
+    {
       name: "Usage",
       description: "Inspect current rate-limit tier and remaining usage.",
     },
@@ -127,9 +131,10 @@ const swaggerDefinition: OAS3Definition = {
           name: { type: "string", example: "My server token" },
           token_prefix: { type: "string", example: "ddg_01234567" },
           last_used_at: { type: "string", nullable: true, example: "2026-03-30 12:34:56" },
+          revoked_at: { type: "string", nullable: true, example: null },
           created_at: { type: "string", example: "2026-03-30 12:00:00" },
         },
-        required: ["id", "name", "token_prefix", "last_used_at", "created_at"],
+        required: ["id", "name", "token_prefix", "last_used_at", "revoked_at", "created_at"],
       },
       RegisterRequest: {
         type: "object",
@@ -169,13 +174,82 @@ const swaggerDefinition: OAS3Definition = {
           query: { type: "string", example: "openai" },
           limit: { type: "integer", example: 10 },
           region: { type: "string", nullable: true, example: "us-en" },
+          responseType: { type: "string", example: "json" },
+          nextCursor: { type: "string", nullable: true, example: "eyJhY3Rpb24iOiIvaHRtbC8iLCJwYXJhbXMiOnsicSI6Im9wZW5haSJ9fQ" },
           count: { type: "integer", example: 2 },
           results: {
             type: "array",
             items: { $ref: "#/components/schemas/DuckDuckGoResult" },
           },
         },
-        required: ["query", "limit", "region", "count", "results"],
+        required: ["query", "limit", "region", "responseType", "nextCursor", "count", "results"],
+      },
+      CrawlLink: {
+        type: "object",
+        properties: {
+          text: { type: "string", example: "OpenAI" },
+          href: { type: "string", example: "https://openai.com/" },
+        },
+        required: ["text", "href"],
+      },
+      CrawlJsonData: {
+        type: "object",
+        properties: {
+          url: { type: "string", example: "https://example.com/" },
+          finalUrl: { type: "string", example: "https://example.com/" },
+          responseType: { type: "string", example: "json" },
+          title: { type: "string", example: "Example Domain" },
+          text: { type: "string", example: "Example Domain This domain is for use in illustrative examples..." },
+          html: { type: "string", example: "<html><head><title>Example Domain</title></head><body>...</body></html>" },
+          links: {
+            type: "array",
+            items: { $ref: "#/components/schemas/CrawlLink" },
+          },
+          executionResult: {
+            nullable: true,
+            example: { pageTitle: "Example Domain" },
+          },
+        },
+        required: ["url", "finalUrl", "responseType", "title", "text", "html", "links", "executionResult"],
+      },
+      ProxyConfig: {
+        type: "object",
+        properties: {
+          server: {
+            type: "string",
+            example: "http://127.0.0.1:8080",
+          },
+          username: {
+            type: "string",
+            nullable: true,
+            example: "proxy-user",
+          },
+          password: {
+            type: "string",
+            nullable: true,
+            example: "proxy-pass",
+          },
+          bypass: {
+            type: "string",
+            nullable: true,
+            example: "<-loopback>",
+          },
+        },
+        required: ["server"],
+      },
+      CrawlContentData: {
+        type: "object",
+        properties: {
+          url: { type: "string", example: "https://example.com/" },
+          finalUrl: { type: "string", example: "https://example.com/" },
+          responseType: { type: "string", example: "html" },
+          content: { type: "string", example: "<html><body>...</body></html>" },
+          executionResult: {
+            nullable: true,
+            example: { pageTitle: "Example Domain" },
+          },
+        },
+        required: ["url", "finalUrl", "responseType", "content", "executionResult"],
       },
       RateLimitErrorData: {
         type: "object",
@@ -620,6 +694,108 @@ const swaggerDefinition: OAS3Definition = {
         },
       },
     },
+    "/auth/tokens/{id}": {
+      patch: {
+        tags: ["Auth"],
+        summary: "Rename an API token",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string", example: "Renamed token" },
+                },
+                required: ["name"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "API token updated.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ApiResponse" },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid request data.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "401": {
+            description: "Missing or invalid bearer token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "404": {
+            description: "API token not found.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+      delete: {
+        tags: ["Auth"],
+        summary: "Revoke an API token",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "API token revoked.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ApiResponse" },
+              },
+            },
+          },
+          "401": {
+            description: "Missing or invalid bearer token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "404": {
+            description: "API token not found.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/search/duckduckgo": {
       get: {
         tags: ["DuckDuckGo Search"],
@@ -646,6 +822,20 @@ const swaggerDefinition: OAS3Definition = {
             required: false,
             schema: { type: "string", example: "us-en" },
             description: "DuckDuckGo region, for example us-en, uk-en, pk-en, wt-wt.",
+          },
+          {
+            in: "query",
+            name: "cursor",
+            required: false,
+            schema: { type: "string" },
+            description: "Opaque cursor from a previous response for fetching the next page.",
+          },
+          {
+            in: "query",
+            name: "response_type",
+            required: false,
+            schema: { type: "string", enum: ["json", "html", "markdown", "txt"], default: "json" },
+            description: "Response format.",
           },
           {
             in: "header",
@@ -757,6 +947,9 @@ const swaggerDefinition: OAS3Definition = {
                   query: { type: "string", example: "openai" },
                   limit: { type: "integer", example: 10 },
                   region: { type: "string", example: "us-en" },
+                  cursor: { type: "string" },
+                  response_type: { type: "string", enum: ["json", "html", "markdown", "txt"], example: "json" },
+                  proxy: { $ref: "#/components/schemas/ProxyConfig" },
                 },
                 required: ["query"],
               },
@@ -792,6 +985,230 @@ const swaggerDefinition: OAS3Definition = {
           },
           "401": {
             description: "Invalid x-api-token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "403": {
+            description: "Custom proxy requires a valid x-api-token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "429": {
+            description: "Too many requests.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ErrorResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/RateLimitErrorData" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal server error.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/crawl": {
+      get: {
+        tags: ["Crawl"],
+        summary: "Crawl a page URL and return rendered output",
+        security: [{ apiTokenAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "url",
+            required: true,
+            schema: { type: "string", format: "uri" },
+            description: "Absolute http or https URL to crawl.",
+          },
+          {
+            in: "query",
+            name: "response_type",
+            required: false,
+            schema: { type: "string", enum: ["json", "html", "markdown", "txt"], default: "json" },
+            description: "Response format.",
+          },
+          {
+            in: "query",
+            name: "js_code",
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Optional JavaScript to execute in the page context after load. Example: return { title: document.title, links: document.links.length };",
+          },
+          {
+            in: "header",
+            name: "x-api-token",
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Optional API token. No token = free tier. Valid token = auth or paid tier depending on the user subscription.",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Crawl completed successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          oneOf: [
+                            { $ref: "#/components/schemas/CrawlJsonData" },
+                            { $ref: "#/components/schemas/CrawlContentData" },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid request data or JavaScript execution failure.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "401": {
+            description: "Invalid x-api-token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "429": {
+            description: "Too many requests.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ErrorResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/RateLimitErrorData" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal server error.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["Crawl"],
+        summary: "Crawl a page URL with a JSON body",
+        security: [{ apiTokenAuth: [] }],
+        parameters: [
+          {
+            in: "header",
+            name: "x-api-token",
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Optional API token. No token = free tier. Valid token = auth or paid tier depending on the user subscription.",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  url: { type: "string", format: "uri", example: "https://example.com/" },
+                  response_type: { type: "string", enum: ["json", "html", "markdown", "txt"], example: "json" },
+                  js_code: {
+                    type: "string",
+                    example: "return { title: document.title, linkCount: document.links.length };",
+                  },
+                  proxy: { $ref: "#/components/schemas/ProxyConfig" },
+                },
+                required: ["url"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Crawl completed successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          oneOf: [
+                            { $ref: "#/components/schemas/CrawlJsonData" },
+                            { $ref: "#/components/schemas/CrawlContentData" },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid request data or JavaScript execution failure.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "401": {
+            description: "Invalid x-api-token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "403": {
+            description: "Custom proxy requires a valid x-api-token.",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },

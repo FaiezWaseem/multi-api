@@ -2,6 +2,9 @@
 
 import puppeteer, { type Page } from "puppeteer";
 
+import { AppError } from "./app-error";
+import { getDefaultProxyConfig, type ProxyConfig } from "./proxy";
+
 export type DuckDuckGoResult = {
   title: string;
   url: string;
@@ -14,6 +17,7 @@ export type DuckDuckGoSearchPayload = {
   results: DuckDuckGoResult[];
   html: string;
   text: string;
+  nextCursor: string | null;
 };
 
 const launchArgs = [
@@ -37,6 +41,10 @@ type DuckDuckGoNextPage = {
   params: Record<string, string>;
 } | null;
 
+type SearchCursorPayload = {
+  offset: number;
+};
+
 function getRealDuckDuckGoUrl(url: string) {
   try {
     const parsedUrl = new URL(url);
@@ -58,6 +66,30 @@ function getAbsoluteDuckDuckGoUrl(pathOrUrl: string) {
   }
 
   return new URL(pathOrUrl, "https://html.duckduckgo.com").toString();
+}
+
+function encodeCursor(nextOffset: number) {
+  return Buffer.from(JSON.stringify({ offset: nextOffset }), "utf8").toString("base64url");
+}
+
+function decodeCursor(cursor: string): SearchCursorPayload {
+  try {
+    const decoded = JSON.parse(
+      Buffer.from(cursor, "base64url").toString("utf8"),
+    ) as SearchCursorPayload;
+
+    if (
+      typeof decoded?.offset !== "number" ||
+      !Number.isFinite(decoded.offset) ||
+      decoded.offset < 0
+    ) {
+      throw new Error("Invalid cursor");
+    }
+
+    return decoded;
+  } catch {
+    throw new AppError("Invalid cursor.", 400);
+  }
 }
 
 async function extractPageData(page: Page) {
@@ -108,6 +140,8 @@ export async function searchDuckDuckGo(
   query: string,
   limit: number,
   region?: string,
+  cursor?: string,
+  proxyConfig?: ProxyConfig | null,
 ): Promise<DuckDuckGoSearchPayload> {
   const searchParams = new URLSearchParams({
     q: query,
@@ -118,19 +152,41 @@ export async function searchDuckDuckGo(
   }
 
   const url = `https://html.duckduckgo.com/html/?${searchParams.toString()}`;
+  const resolvedProxyConfig = proxyConfig ?? getDefaultProxyConfig();
+  const browserLaunchArgs = [...launchArgs];
+
+  if (resolvedProxyConfig?.server) {
+    browserLaunchArgs.push(`--proxy-server=${resolvedProxyConfig.server}`);
+  }
+
+  if (resolvedProxyConfig?.bypass) {
+    browserLaunchArgs.push(`--proxy-bypass-list=${resolvedProxyConfig.bypass}`);
+  }
+
   const browser = await puppeteer.launch({
     headless: true,
-    args: launchArgs,
+    args: browserLaunchArgs,
   });
 
   try {
     const page = await browser.newPage();
     await page.setUserAgent(defaultUserAgent);
+
+    if (resolvedProxyConfig?.server && resolvedProxyConfig.username) {
+      await page.authenticate({
+        username: resolvedProxyConfig.username,
+        password: resolvedProxyConfig.password ?? "",
+      });
+    }
+
     const normalizedResults: DuckDuckGoResult[] = [];
     const seenUrls = new Set<string>();
     const htmlPages: string[] = [];
     const textPages: string[] = [];
+    const offset = cursor ? decodeCursor(cursor).offset : 0;
+    let traversedCount = 0;
     let nextPageUrl: string | null = url;
+    let nextCursor: string | null = null;
     let pageCount = 0;
 
     while (nextPageUrl && normalizedResults.length < limit && pageCount < 10) {
@@ -158,21 +214,33 @@ export async function searchDuckDuckGo(
         }
 
         seenUrls.add(realUrl);
+
+        if (traversedCount < offset) {
+          traversedCount += 1;
+          continue;
+        }
+
         normalizedResults.push({
           title: item.title,
           url: realUrl,
           snippet: item.snippet,
         });
+        traversedCount += 1;
 
         if (normalizedResults.length >= limit) {
           break;
         }
       }
 
+      if (normalizedResults.length >= limit) {
+        nextCursor = encodeCursor(offset + normalizedResults.length);
+      }
+
       if (!nextPage || normalizedResults.length >= limit) {
         nextPageUrl = null;
       } else {
         nextPageUrl = `${getAbsoluteDuckDuckGoUrl(nextPage.action)}?${new URLSearchParams(nextPage.params).toString()}`;
+        nextCursor = encodeCursor(traversedCount);
       }
 
       pageCount += 1;
@@ -182,6 +250,7 @@ export async function searchDuckDuckGo(
       results: normalizedResults.slice(0, limit),
       html: htmlPages.join("\n<!-- page-break -->\n"),
       text: textPages.join("\n\n"),
+      nextCursor,
     };
   } finally {
     await browser.close();

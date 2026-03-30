@@ -36,8 +36,16 @@ db.exec(`
     token_prefix TEXT NOT NULL,
     token_hash TEXT NOT NULL UNIQUE,
     last_used_at TEXT,
+    revoked_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS search_cache (
+    cache_key TEXT PRIMARY KEY,
+    payload_json TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
   CREATE TABLE IF NOT EXISTS login_logs (
@@ -68,6 +76,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   CREATE INDEX IF NOT EXISTS idx_auth_sessions_token_hash ON auth_sessions(token_hash);
   CREATE INDEX IF NOT EXISTS idx_api_tokens_token_hash ON api_tokens(token_hash);
+  CREATE INDEX IF NOT EXISTS idx_search_cache_expires_at ON search_cache(expires_at);
   CREATE INDEX IF NOT EXISTS idx_login_logs_user_id ON login_logs(user_id);
   CREATE INDEX IF NOT EXISTS idx_search_logs_user_id ON search_logs(user_id);
 `);
+
+const apiTokensColumns = db
+  .query("PRAGMA table_info(api_tokens)")
+  .all() as Array<{ name: string }>;
+
+if (!apiTokensColumns.some((column) => column.name === "revoked_at")) {
+  db.exec("ALTER TABLE api_tokens ADD COLUMN revoked_at TEXT");
+}

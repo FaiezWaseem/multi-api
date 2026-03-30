@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-const maxLimit = 50;
-const cursorSchema = z.string().trim().min(1).optional();
 const responseTypeSchema = z.enum(["html", "json", "markdown", "txt"]).default("json");
 const proxySchema = z
   .object({
@@ -24,26 +22,23 @@ const proxySchema = z
     }
   })
   .optional();
-const regionSchema = z
+const urlSchema = z
   .string()
   .trim()
-  .min(1)
-  .regex(/^[a-z]{2}-[a-z]{2}$/i, "region must look like wt-wt, us-en, uk-en")
-  .transform((value) => value.toLowerCase());
+  .url("url must be a valid absolute URL")
+  .refine((value) => /^https?:\/\//i.test(value), "url must start with http:// or https://");
 
-export const getDuckDuckGoSearchSchema = z.object({
-  query: z.string().trim().min(1, "query is required"),
-  limit: z.coerce.number().int().min(1).max(maxLimit).default(10),
-  region: regionSchema.optional(),
+const jsCodeSchema = z.string().trim().min(1).max(10_000).optional();
+
+export const getCrawlSchema = z.object({
+  url: urlSchema,
   response_type: responseTypeSchema,
-  cursor: cursorSchema,
+  js_code: jsCodeSchema,
 });
 
-export const postDuckDuckGoSearchSchema = z.object({
-  limit: z.coerce.number().int().min(1).max(maxLimit).default(10),
-  query: z.string().trim().min(1, "query is required"),
-  region: regionSchema.optional(),
+export const postCrawlSchema = z.object({
+  url: urlSchema,
   response_type: responseTypeSchema,
-  cursor: cursorSchema,
+  js_code: jsCodeSchema,
   proxy: proxySchema,
 });
