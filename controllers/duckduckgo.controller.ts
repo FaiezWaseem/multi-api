@@ -13,8 +13,8 @@ export async function getDuckDuckGoSearchController(
   next: NextFunction,
 ) {
   try {
-    const { query, limit, region } = getDuckDuckGoSearchSchema.parse(req.query);
-    const payload = await getDuckDuckGoSearchResults(query, limit, region, {
+    const { query, limit, region, response_type } = getDuckDuckGoSearchSchema.parse(req.query);
+    const payload = await getDuckDuckGoSearchResults(query, limit, region, response_type, {
       userId: req.apiConsumer?.id,
       apiTokenId: req.apiConsumer?.tokenId,
       ipAddress: req.ip,
@@ -33,12 +33,13 @@ export async function postDuckDuckGoSearchController(
   next: NextFunction,
 ) {
   try {
-    const { query, limit, region } = postDuckDuckGoSearchSchema.parse({
+    const { query, limit, region, response_type } = postDuckDuckGoSearchSchema.parse({
       ...req.body,
       limit: req.body?.limit ?? req.query.limit,
       region: req.body?.region ?? req.query.region,
+      response_type: req.body?.response_type ?? req.query.response_type,
     });
-    const payload = await getDuckDuckGoSearchResults(query, limit, region, {
+    const payload = await getDuckDuckGoSearchResults(query, limit, region, response_type, {
       userId: req.apiConsumer?.id,
       apiTokenId: req.apiConsumer?.tokenId,
       ipAddress: req.ip,
