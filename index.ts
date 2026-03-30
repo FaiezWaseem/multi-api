@@ -12,6 +12,7 @@ import {
   getDuckDuckGoSearchController,
   postDuckDuckGoSearchController,
 } from "./controllers/duckduckgo.controller";
+import { llmGuide } from "./docs/llm-guide";
 import { swaggerSpec } from "./docs/swagger";
 import { AppError } from "./lib/app-error";
 import { createErrorResponse } from "./lib/api-response";
@@ -33,6 +34,10 @@ app.use(attachApiConsumer);
 
 app.get("/openapi.json", (_req: Request, res: Response) => {
   res.json(swaggerSpec);
+});
+
+app.get("/llm.txt", (_req: Request, res: Response) => {
+  res.type("text/plain").send(llmGuide);
 });
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
