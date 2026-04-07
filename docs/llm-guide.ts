@@ -84,6 +84,8 @@ Usage Endpoint
 DuckDuckGo Search Endpoints
 - GET /search/duckduckgo
 - POST /search/duckduckgo
+- GET /search/company-contacts
+- POST /search/company-contacts
 
 Search Input Fields
 - query: string, required
@@ -120,6 +122,30 @@ Search POST Example
       "region": "us-en",
       "response_type": "json"
     }
+
+Company Contact Discovery
+- Finds an official company domain from a business title when domain is not supplied
+- Crawls a small set of official pages and extracts only publicly listed company-domain emails
+- Does not infer or generate personal executive email addresses
+- Response data includes:
+  - title
+  - domain
+  - officialWebsite
+  - emails[]
+  - scannedPages[]
+  - note
+  - searchResultsUsed[]
+
+Company Contact POST Example
+- POST /search/company-contacts
+  - Body:
+    {
+      "title": "Microsoft"
+    }
+
+Company Contact Input Fields
+- title: string, required
+- domain: optional hostname override like microsoft.com
 
 Custom Proxy Support
 - Supported on POST /search/duckduckgo and POST /crawl

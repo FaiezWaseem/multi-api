@@ -195,7 +195,7 @@ export const adminViewHtml = `<!DOCTYPE html>
               <input name="email" type="email" value="admin@local.dev" required />
             </label>
             <label>Password
-              <input name="password" type="password" value="admin123456" required />
+              <input name="password" type="password" required />
             </label>
             <button type="submit">Login</button>
           </form>

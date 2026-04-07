@@ -12,6 +12,10 @@ import {
   getDuckDuckGoSearchController,
   postDuckDuckGoSearchController,
 } from "./controllers/duckduckgo.controller";
+import {
+  getCompanyContactController,
+  postCompanyContactController,
+} from "./controllers/company-contact.controller";
 import { llmGuide } from "./docs/llm-guide";
 import { swaggerSpec } from "./docs/swagger";
 import { AppError } from "./lib/app-error";
@@ -53,6 +57,8 @@ app.get("/crawl", requireApiTokenAccess, searchRateLimiter, getCrawlController);
 app.post("/crawl", requireApiTokenAccess, searchRateLimiter, postCrawlController);
 app.get("/search/duckduckgo", searchRateLimiter, getDuckDuckGoSearchController);
 app.post("/search/duckduckgo", searchRateLimiter, postDuckDuckGoSearchController);
+app.get("/search/company-contacts", searchRateLimiter, getCompanyContactController);
+app.post("/search/company-contacts", searchRateLimiter, postCompanyContactController);
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (error instanceof z.ZodError) {

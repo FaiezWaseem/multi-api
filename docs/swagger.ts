@@ -21,7 +21,7 @@ const swaggerDefinition: OAS3Definition = {
     },
     {
       name: "DuckDuckGo Search",
-      description: "Search DuckDuckGo with GET or POST requests.",
+      description: "Search DuckDuckGo or discover public company contact emails.",
     },
     {
       name: "Crawl",
@@ -208,6 +208,49 @@ const swaggerDefinition: OAS3Definition = {
           content: { type: "string", example: "<html><body>...</body></html>" },
         },
         required: ["query", "limit", "region", "responseType", "nextCursor", "content"],
+      },
+      CompanyContactEmail: {
+        type: "object",
+        properties: {
+          email: { type: "string", example: "contact@microsoft.com" },
+          sourceUrl: { type: "string", example: "https://www.microsoft.com/en-us/contactus" },
+          type: { type: "string", enum: ["business", "other-public"], example: "business" },
+        },
+        required: ["email", "sourceUrl", "type"],
+      },
+      CompanyContactSearchResult: {
+        type: "object",
+        properties: {
+          title: { type: "string", example: "Microsoft - Official Home Page" },
+          url: { type: "string", example: "https://www.microsoft.com/" },
+        },
+        required: ["title", "url"],
+      },
+      CompanyContactData: {
+        type: "object",
+        properties: {
+          title: { type: "string", example: "Microsoft" },
+          domain: { type: "string", example: "microsoft.com" },
+          officialWebsite: { type: "string", example: "https://www.microsoft.com/" },
+          emails: {
+            type: "array",
+            items: { $ref: "#/components/schemas/CompanyContactEmail" },
+          },
+          scannedPages: {
+            type: "array",
+            items: { type: "string" },
+          },
+          note: {
+            type: "string",
+            example:
+              "This endpoint only returns publicly listed company-domain emails found on official pages. It does not infer or generate personal executive email addresses.",
+          },
+          searchResultsUsed: {
+            type: "array",
+            items: { $ref: "#/components/schemas/CompanyContactSearchResult" },
+          },
+        },
+        required: ["title", "domain", "officialWebsite", "emails", "scannedPages", "note", "searchResultsUsed"],
       },
       CrawlLink: {
         type: "object",
@@ -1354,6 +1397,175 @@ const swaggerDefinition: OAS3Definition = {
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/search/company-contacts": {
+      get: {
+        tags: ["DuckDuckGo Search"],
+        summary: "Discover public company contact emails from an official domain",
+        security: [{ apiTokenAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "title",
+            required: true,
+            schema: { type: "string" },
+            description: "Business or organization name, for example Microsoft.",
+          },
+          {
+            in: "query",
+            name: "domain",
+            required: false,
+            schema: { type: "string", example: "microsoft.com" },
+            description: "Optional official domain override to skip domain discovery.",
+          },
+          {
+            in: "header",
+            name: "x-api-token",
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Optional API token. No token = free tier. Valid token = auth or paid tier depending on the user subscription.",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Company contact discovery completed successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/CompanyContactData" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid request data.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "404": {
+            description: "Could not determine the official domain.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "429": {
+            description: "Too many requests.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ErrorResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/RateLimitErrorData" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["DuckDuckGo Search"],
+        summary: "Discover public company contact emails from a JSON body",
+        security: [{ apiTokenAuth: [] }],
+        parameters: [
+          {
+            in: "header",
+            name: "x-api-token",
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Optional API token. No token = free tier. Valid token = auth or paid tier depending on the user subscription.",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  title: { type: "string", example: "Microsoft" },
+                  domain: { type: "string", example: "microsoft.com" },
+                },
+                required: ["title"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Company contact discovery completed successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/CompanyContactData" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid request data.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "404": {
+            description: "Could not determine the official domain.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "429": {
+            description: "Too many requests.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ErrorResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/RateLimitErrorData" },
+                      },
+                    },
+                  ],
+                },
               },
             },
           },
