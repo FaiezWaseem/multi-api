@@ -29,6 +29,8 @@ import { adminRouter } from "./routes/admin.routes";
 import { authRouter } from "./routes/auth.routes";
 import { logRouter } from "./routes/log.routes";
 import { usageRouter } from "./routes/usage.routes";
+import { accountViewHtml } from "./views/account-view";
+import { landingViewHtml } from "./views/landing-view";
 await ensureDefaultAdminUser();
 
 const app = express();
@@ -38,6 +40,14 @@ app.use(cors());
 app.use(express.json());
 app.use(attachApiConsumer);
 app.use(requestLogMiddleware);
+
+app.get("/", (_req: Request, res: Response) => {
+  res.type("html").send(landingViewHtml);
+});
+
+app.get("/account", (_req: Request, res: Response) => {
+  res.type("html").send(accountViewHtml);
+});
 
 app.get("/openapi.json", (_req: Request, res: Response) => {
   res.json(swaggerSpec);
