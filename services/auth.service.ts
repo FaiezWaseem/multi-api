@@ -109,6 +109,11 @@ const grantMonthlyCreditsStatement = db.query(
    SET credits = credits + ?, monthly_credit_grant_at = ?, updated_at = CURRENT_TIMESTAMP
    WHERE id = ?`,
 );
+const decrementUserCreditsStatement = db.query(
+  `UPDATE users
+   SET credits = credits - ?, updated_at = CURRENT_TIMESTAMP
+   WHERE id = ? AND credits >= ?`,
+);
 
 function publicUser(user: Pick<UserRecord, "id" | "email" | "is_paid" | "is_admin" | "credits" | "created_at">) {
   return {
@@ -303,6 +308,42 @@ export function getApiConsumerFromToken(apiToken: string) {
     tier: user.is_paid ? "paid" : "auth",
     isAdmin: Boolean(user.is_admin),
   } as const;
+}
+
+export function consumeUserCredits(userId: string, amount: number) {
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new AppError("Credit amount must be a positive integer.", 400);
+  }
+
+  const user = refreshMonthlyCreditsIfNeeded(findUserByIdStatement.get(userId) as UserRecord | null);
+
+  if (!user) {
+    throw new AppError("User not found.", 404);
+  }
+
+  if (user.credits < amount) {
+    throw new AppError("Insufficient credits for this request.", 402, {
+      requiredCredits: amount,
+      availableCredits: user.credits,
+    });
+  }
+
+  const result = decrementUserCreditsStatement.run(amount, userId, amount);
+
+  if ("changes" in result && result.changes === 0) {
+    throw new AppError("Insufficient credits for this request.", 402, {
+      requiredCredits: amount,
+      availableCredits: user.credits,
+    });
+  }
+
+  const updatedUser = findUserByIdStatement.get(userId) as UserRecord;
+
+  return {
+    userId,
+    debitedAmount: amount,
+    remainingCredits: updatedUser.credits,
+  };
 }
 
 export async function ensureDefaultAdminUser() {

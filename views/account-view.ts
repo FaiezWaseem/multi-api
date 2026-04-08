@@ -255,6 +255,158 @@ export const accountViewHtml = `<!DOCTYPE html>
       gap: 22px;
     }
 
+    .console-grid {
+      display: grid;
+      grid-template-columns: 0.92fr 1.08fr;
+      gap: 22px;
+    }
+
+    .console-list {
+      display: grid;
+      gap: 16px;
+    }
+
+    .console-card {
+      padding: 18px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.08);
+      cursor: pointer;
+      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+    }
+
+    .console-card.active {
+      background: rgba(255,255,255,0.14);
+      border-color: rgba(60,226,162,0.4);
+      transform: translateY(-1px);
+    }
+
+    .console-card h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+
+    .console-card p {
+      margin: 0;
+      font-size: 0.92rem;
+    }
+
+    .console-detail {
+      display: grid;
+      gap: 18px;
+    }
+
+    .console-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 16px;
+    }
+
+    .method-switch {
+      display: inline-grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      padding: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .method-switch button {
+      border: 0;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font: inherit;
+      font-weight: 700;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .method-switch button.active {
+      background: white;
+      color: #1b2442;
+    }
+
+    .console-helper {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.65;
+    }
+
+    .console-helper code {
+      color: #d4fff1;
+      word-break: break-all;
+    }
+
+    .console-form {
+      display: grid;
+      gap: 14px;
+    }
+
+    .form-section {
+      display: grid;
+      gap: 14px;
+    }
+
+    .form-section.hidden {
+      display: none;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    select, textarea {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.94);
+      color: #18203b;
+      outline: none;
+      font: inherit;
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    .response-box {
+      border-radius: 22px;
+      border: 1px solid rgba(60,226,162,0.18);
+      background: rgba(8, 10, 24, 0.72);
+      overflow: hidden;
+    }
+
+    .response-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .response-box pre {
+      margin: 0;
+      padding: 18px;
+      max-height: 480px;
+      overflow: auto;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: #9efdcf;
+    }
+
     .dashboard-grid {
       display: grid;
       grid-template-columns: 0.92fr 1.08fr;
@@ -343,7 +495,7 @@ export const accountViewHtml = `<!DOCTYPE html>
     }
 
     @media (max-width: 980px) {
-      .auth-shell, .dashboard-grid {
+      .auth-shell, .dashboard-grid, .console-grid, .field-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -502,6 +654,139 @@ export const accountViewHtml = `<!DOCTYPE html>
           </section>
         </div>
       </div>
+
+      <section class="panel">
+        <div class="console-head">
+          <div>
+            <h2>API Console</h2>
+            <p>Plug in values, switch between GET and POST, optionally attach your latest API token, and inspect the live response for every available endpoint.</p>
+          </div>
+          <div class="method-switch">
+            <button id="method-get" class="active" type="button">GET</button>
+            <button id="method-post" type="button">POST</button>
+          </div>
+        </div>
+
+        <div class="console-grid">
+          <div class="console-list" id="console-list">
+            <article class="console-card active" data-console="search">
+              <h3>DuckDuckGo Search</h3>
+              <p>Test /search/duckduckgo with query, region, limit, and response type.</p>
+            </article>
+            <article class="console-card" data-console="crawl">
+              <h3>Page Crawl</h3>
+              <p>Test /crawl with URL, response type, JavaScript, and optional proxy config.</p>
+            </article>
+            <article class="console-card" data-console="company">
+              <h3>Company Contacts</h3>
+              <p>Test /search/company-contacts with job title and optional company domain.</p>
+            </article>
+            <article class="console-card" data-console="usage">
+              <h3>Usage Snapshot</h3>
+              <p>Test /usage using the session or an explicit x-api-token header.</p>
+            </article>
+          </div>
+
+          <div class="console-detail">
+            <div class="console-helper">
+              <div><strong id="console-title">DuckDuckGo Search</strong></div>
+              <div id="console-description" style="margin-top:8px;">Use your session by default, or attach an API token for token-based requests and crawl access.</div>
+              <div style="margin-top:10px;">Endpoint: <code id="console-endpoint">/search/duckduckgo</code></div>
+            </div>
+
+            <form class="console-form" id="console-form">
+              <div id="search-fields" class="form-section">
+                <div class="field-grid">
+                  <label>Query
+                    <input id="console-query" type="text" placeholder="Open source AI agents" />
+                  </label>
+                  <label>Region
+                    <input id="console-region" type="text" placeholder="us-en" />
+                  </label>
+                </div>
+
+                <div class="field-grid">
+                  <label>Limit
+                    <input id="console-limit" type="number" min="1" max="50" value="8" />
+                  </label>
+                  <label>Response Type
+                    <select id="console-response-type">
+                      <option value="json">json</option>
+                      <option value="markdown">markdown</option>
+                      <option value="txt">txt</option>
+                      <option value="html">html</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div id="crawl-fields" class="form-section hidden">
+                <label>URL
+                  <input id="console-url" type="text" placeholder="https://example.com" />
+                </label>
+
+                <div class="field-grid">
+                  <label>Response Type
+                    <select id="console-crawl-response-type">
+                      <option value="json">json</option>
+                      <option value="markdown">markdown</option>
+                      <option value="txt">txt</option>
+                      <option value="html">html</option>
+                    </select>
+                  </label>
+                  <div></div>
+                </div>
+
+                <label>JavaScript for Crawl
+                  <textarea id="console-js-code" placeholder="document.body.innerText"></textarea>
+                </label>
+
+                <label>Proxy JSON
+                  <textarea id="console-proxy" placeholder='{"server":"http://proxy-host:8080","username":"user","password":"pass"}'></textarea>
+                </label>
+              </div>
+
+              <div id="company-fields" class="form-section hidden">
+                <div class="field-grid">
+                  <label>Company Title
+                    <input id="console-title-input" type="text" placeholder="Head of Marketing" />
+                  </label>
+                  <label>Company Domain
+                    <input id="console-domain" type="text" placeholder="example.com" />
+                  </label>
+                </div>
+              </div>
+
+              <div id="usage-fields" class="form-section hidden">
+                <div class="console-helper">
+                  Usage snapshot does not need a request body. Run it with your logged-in session or provide an API token override below.
+                </div>
+              </div>
+
+              <label>Manual x-api-token Override
+                <input id="console-token" type="text" placeholder="Leave empty to use the signed-in session only" />
+              </label>
+
+              <div class="row">
+                <button type="submit">Run Request</button>
+                <button class="button-muted" id="console-use-latest-token" type="button">Use Latest Token</button>
+                <button class="button-muted" id="console-copy-curl" type="button">Copy cURL</button>
+              </div>
+              <div class="message" id="console-message"></div>
+            </form>
+
+            <div class="response-box">
+              <div class="response-head">
+                <strong>Live Response</strong>
+                <span class="muted" id="console-response-meta">Ready</span>
+              </div>
+              <pre id="console-response">{
+  "message": "Select an API and run a request."
+}</pre>
+            </div>
+          </div>
+        </div>
+      </section>
     </section>
   </div>
 
@@ -540,10 +825,86 @@ export const accountViewHtml = `<!DOCTYPE html>
     const usageIdentity = document.getElementById("usage-identity");
     const usageMinute = document.getElementById("usage-minute");
     const usageDay = document.getElementById("usage-day");
+    const consoleCards = Array.from(document.querySelectorAll(".console-card"));
+    const methodGetButton = document.getElementById("method-get");
+    const methodPostButton = document.getElementById("method-post");
+    const consoleTitle = document.getElementById("console-title");
+    const consoleDescription = document.getElementById("console-description");
+    const consoleEndpoint = document.getElementById("console-endpoint");
+    const consoleForm = document.getElementById("console-form");
+    const consoleMessage = document.getElementById("console-message");
+    const consoleResponse = document.getElementById("console-response");
+    const consoleResponseMeta = document.getElementById("console-response-meta");
+    const consoleUseLatestToken = document.getElementById("console-use-latest-token");
+    const consoleCopyCurl = document.getElementById("console-copy-curl");
+    const consoleTokenInput = document.getElementById("console-token");
+    const searchFields = document.getElementById("search-fields");
+    const crawlFields = document.getElementById("crawl-fields");
+    const companyFields = document.getElementById("company-fields");
+    const usageFields = document.getElementById("usage-fields");
+    const consoleQueryInput = document.getElementById("console-query");
+    const consoleRegionInput = document.getElementById("console-region");
+    const consoleLimitInput = document.getElementById("console-limit");
+    const consoleResponseTypeInput = document.getElementById("console-response-type");
+    const consoleCrawlResponseTypeInput = document.getElementById("console-crawl-response-type");
+    const consoleUrlInput = document.getElementById("console-url");
+    const consoleTitleInput = document.getElementById("console-title-input");
+    const consoleDomainInput = document.getElementById("console-domain");
+    const consoleJsCodeInput = document.getElementById("console-js-code");
+    const consoleProxyInput = document.getElementById("console-proxy");
+
+    let currentConsole = "search";
+    let currentMethod = "GET";
+
+    const consoleConfigs = {
+      search: {
+        title: "DuckDuckGo Search",
+        description: "Search DuckDuckGo with query, optional region, limit, and response type.",
+        endpoint: "/search/duckduckgo"
+      },
+      crawl: {
+        title: "Page Crawl",
+        description: "Crawl a page with URL, response type, optional JavaScript, and optional proxy for token users.",
+        endpoint: "/crawl"
+      },
+      company: {
+        title: "Company Contacts",
+        description: "Look up likely company contact emails with a job title and optional company domain.",
+        endpoint: "/search/company-contacts"
+      },
+      usage: {
+        title: "Usage Snapshot",
+        description: "Inspect usage for the current signed-in user or a pasted API token.",
+        endpoint: "/usage"
+      }
+    };
 
     function setMessage(node, text, isError) {
       node.textContent = text || "";
       node.className = "message" + (isError ? " error" : "");
+    }
+
+    function setConsoleMode(name) {
+      currentConsole = name;
+      const config = consoleConfigs[name];
+      consoleTitle.textContent = config.title;
+      consoleDescription.textContent = config.description;
+      consoleEndpoint.textContent = config.endpoint;
+      for (const card of consoleCards) {
+        card.classList.toggle("active", card.dataset.console === name);
+      }
+      consoleResponseMeta.textContent = "Ready";
+      setMessage(consoleMessage, "");
+      searchFields.classList.toggle("hidden", name !== "search");
+      crawlFields.classList.toggle("hidden", name !== "crawl");
+      companyFields.classList.toggle("hidden", name !== "company");
+      usageFields.classList.toggle("hidden", name !== "usage");
+    }
+
+    function setRequestMethod(method) {
+      currentMethod = method;
+      methodGetButton.classList.toggle("active", method === "GET");
+      methodPostButton.classList.toggle("active", method === "POST");
     }
 
     function setAuthMode(mode) {
@@ -688,6 +1049,127 @@ export const accountViewHtml = `<!DOCTYPE html>
       showDashboard(true);
       await loadTokens();
       await refreshUsage();
+    }
+
+    function buildConsoleRequest() {
+      const tokenOverride = consoleTokenInput.value.trim();
+      const sessionToken = getSessionToken();
+      const headers = {};
+
+      if (sessionToken) {
+        headers["Authorization"] = "Bearer " + sessionToken;
+      }
+
+      if (tokenOverride) {
+        headers["x-api-token"] = tokenOverride;
+      }
+
+      if (currentConsole === "usage") {
+        return {
+          url: "/usage",
+          options: { headers }
+        };
+      }
+
+      if (currentConsole === "search") {
+        const payload = {
+          query: consoleQueryInput.value.trim(),
+          region: consoleRegionInput.value.trim(),
+          limit: consoleLimitInput.value,
+          response_type: consoleResponseTypeInput.value
+        };
+
+        if (currentMethod === "GET") {
+          const params = new URLSearchParams();
+          if (payload.query) params.set("query", payload.query);
+          if (payload.region) params.set("region", payload.region);
+          if (payload.limit) params.set("limit", payload.limit);
+          if (payload.response_type) params.set("response_type", payload.response_type);
+          return { url: "/search/duckduckgo?" + params.toString(), options: { headers } };
+        }
+
+        headers["Content-Type"] = "application/json";
+        return {
+          url: "/search/duckduckgo",
+          options: {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload)
+          }
+        };
+      }
+
+      if (currentConsole === "crawl") {
+        const proxyText = consoleProxyInput.value.trim();
+        let proxy;
+        if (proxyText) {
+          proxy = JSON.parse(proxyText);
+        }
+
+        const payload = {
+          url: consoleUrlInput.value.trim(),
+          response_type: consoleCrawlResponseTypeInput.value,
+          js_code: consoleJsCodeInput.value.trim(),
+          proxy
+        };
+
+        if (currentMethod === "GET") {
+          const params = new URLSearchParams();
+          if (payload.url) params.set("url", payload.url);
+          if (payload.response_type) params.set("response_type", payload.response_type);
+          if (payload.js_code) params.set("js_code", payload.js_code);
+          return { url: "/crawl?" + params.toString(), options: { headers } };
+        }
+
+        headers["Content-Type"] = "application/json";
+        return {
+          url: "/crawl",
+          options: {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload)
+          }
+        };
+      }
+
+      const payload = {
+        title: consoleTitleInput.value.trim(),
+        domain: consoleDomainInput.value.trim()
+      };
+
+      if (currentMethod === "GET") {
+        const params = new URLSearchParams();
+        if (payload.title) params.set("title", payload.title);
+        if (payload.domain) params.set("domain", payload.domain);
+        return { url: "/search/company-contacts?" + params.toString(), options: { headers } };
+      }
+
+      headers["Content-Type"] = "application/json";
+      return {
+        url: "/search/company-contacts",
+        options: {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload)
+        }
+      };
+    }
+
+    function buildCurlPreview() {
+      const request = buildConsoleRequest();
+      const method = request.options.method || "GET";
+      const parts = ['curl --request ' + method, '"http://localhost:3000' + request.url + '"'];
+      const headers = request.options.headers || {};
+
+      for (const key of Object.keys(headers)) {
+        parts.push('-H "' + key + ': ' + String(headers[key]).replaceAll('"', '\\"') + '"');
+      }
+
+      if (request.options.body) {
+        parts.push("--data '" + String(request.options.body).replaceAll(\"'\", \"'\\\\''\") + "'");
+      }
+
+      return parts.join(" ");
     }
 
     registerForm.addEventListener("submit", async (event) => {
@@ -844,6 +1326,59 @@ export const accountViewHtml = `<!DOCTYPE html>
       }
     });
 
+    consoleForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      setMessage(consoleMessage, "");
+      consoleResponseMeta.textContent = "Request running";
+
+      try {
+        const request = buildConsoleRequest();
+        const response = await fetch(request.url, request.options);
+        const contentType = response.headers.get("content-type") || "";
+        const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+
+        if (!response.ok) {
+          throw new Error(typeof payload === "string" ? payload : (payload.message || "Request failed"));
+        }
+
+        consoleResponse.textContent = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+        consoleResponseMeta.textContent = (request.options.method || "GET") + " " + request.url;
+        setMessage(consoleMessage, "Request completed successfully.");
+      } catch (error) {
+        consoleResponse.textContent = JSON.stringify({
+          error: error.message || "Request failed"
+        }, null, 2);
+        consoleResponseMeta.textContent = "Request failed";
+        setMessage(consoleMessage, error.message || "Request failed", true);
+      }
+    });
+
+    for (const card of consoleCards) {
+      card.addEventListener("click", () => {
+        setConsoleMode(card.dataset.console || "search");
+      });
+    }
+
+    methodGetButton.addEventListener("click", () => setRequestMethod("GET"));
+    methodPostButton.addEventListener("click", () => setRequestMethod("POST"));
+
+    consoleUseLatestToken.addEventListener("click", () => {
+      const token = getLatestApiToken();
+      consoleTokenInput.value = token;
+      if (!token) {
+        setMessage(consoleMessage, "No newly created token is stored in this browser session yet.", true);
+      }
+    });
+
+    consoleCopyCurl.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(buildCurlPreview());
+        setMessage(consoleMessage, "cURL command copied to clipboard.");
+      } catch {
+        setMessage(consoleMessage, "Unable to copy automatically. Try again in a secure browser context.", true);
+      }
+    });
+
     showLoginButton.addEventListener("click", () => setAuthMode("login"));
     showRegisterButton.addEventListener("click", () => setAuthMode("register"));
     switchToRegister.addEventListener("click", (event) => {
@@ -856,6 +1391,8 @@ export const accountViewHtml = `<!DOCTYPE html>
     });
 
     setAuthMode("login");
+    setConsoleMode("search");
+    setRequestMethod("GET");
     showDashboard(false);
   </script>
 </body>

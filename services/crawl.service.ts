@@ -1,5 +1,6 @@
 import { crawlPage, type CrawlPayload, type CrawlResponseType } from "../lib/crawl";
 import type { ProxyConfig } from "../lib/proxy";
+import { consumeUserCredits } from "./auth.service";
 
 function serializeExecutionResult(value: unknown) {
   if (value === null || value === undefined) {
@@ -61,8 +62,16 @@ export async function getCrawlResults(
   responseType: CrawlResponseType = "json",
   jsCode?: string,
   proxy?: ProxyConfig,
+  metadata?: {
+    userId?: string;
+    creditCost?: number;
+  },
 ) {
   const payload = await crawlPage(url, jsCode, proxy);
+
+  if (metadata?.userId) {
+    consumeUserCredits(metadata.userId, metadata.creditCost ?? 1);
+  }
 
   if (responseType === "html") {
     return {

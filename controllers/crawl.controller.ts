@@ -8,7 +8,10 @@ import { getCrawlSchema, postCrawlSchema } from "../validations/crawl.validation
 export async function getCrawlController(req: Request, res: Response, next: NextFunction) {
   try {
     const { url, response_type, js_code } = getCrawlSchema.parse(req.query);
-    const payload = await getCrawlResults(url, response_type, js_code);
+    const payload = await getCrawlResults(url, response_type, js_code, undefined, {
+      userId: req.apiConsumer?.id,
+      creditCost: 1,
+    });
 
     res.status(200).json(createSuccessResponse("Page crawl completed successfully", payload));
   } catch (error) {
@@ -28,7 +31,10 @@ export async function postCrawlController(req: Request, res: Response, next: Nex
       throw new AppError("Custom proxy is only available for authenticated x-api-token requests.", 403);
     }
 
-    const payload = await getCrawlResults(url, response_type, js_code, proxy);
+    const payload = await getCrawlResults(url, response_type, js_code, proxy, {
+      userId: req.apiConsumer?.id,
+      creditCost: 1,
+    });
 
     res.status(200).json(createSuccessResponse("Page crawl completed successfully", payload));
   } catch (error) {

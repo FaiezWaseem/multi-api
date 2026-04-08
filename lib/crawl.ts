@@ -116,7 +116,7 @@ export async function crawlPage(
     const payload = await page.evaluate((inputUrl, scriptResult) => {
       const links = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"))
         .map((anchor) => ({
-          text: anchor.innerText.trim(),
+          text: anchor.innerText?.trim(),
           href: anchor.href,
         }))
         .filter((link) => link.href)
@@ -125,9 +125,9 @@ export async function crawlPage(
       return {
         url: inputUrl,
         finalUrl: window.location.href,
-        title: document.title.trim(),
+        title: document.title?.trim(),
         html: document.documentElement.outerHTML,
-        text: document.body?.innerText.trim() ?? "",
+        text: document.body?.innerText?.trim() ?? "",
         links,
         executionResult: scriptResult,
       };
