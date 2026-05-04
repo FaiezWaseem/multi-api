@@ -13,6 +13,14 @@ import {
   postDuckDuckGoSearchController,
 } from "./controllers/duckduckgo.controller";
 import {
+  getGoogleSearchController,
+  postGoogleSearchController,
+} from "./controllers/google.controller";
+import {
+  getYelpSearchController,
+  postYelpSearchController,
+} from "./controllers/yelp.controller";
+import {
   getCompanyContactController,
   postCompanyContactController,
 } from "./controllers/company-contact.controller";
@@ -67,6 +75,10 @@ app.get("/crawl", requireApiTokenAccess, searchRateLimiter, getCrawlController);
 app.post("/crawl", requireApiTokenAccess, searchRateLimiter, postCrawlController);
 app.get("/search/duckduckgo", searchRateLimiter, getDuckDuckGoSearchController);
 app.post("/search/duckduckgo", searchRateLimiter, postDuckDuckGoSearchController);
+app.get("/search/google", searchRateLimiter, getGoogleSearchController);
+app.post("/search/google", searchRateLimiter, postGoogleSearchController);
+app.get("/search/yelp", searchRateLimiter, getYelpSearchController);
+app.post("/search/yelp", searchRateLimiter, postYelpSearchController);
 app.get("/search/company-contacts", searchRateLimiter, getCompanyContactController);
 app.post("/search/company-contacts", searchRateLimiter, postCompanyContactController);
 

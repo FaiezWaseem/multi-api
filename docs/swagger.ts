@@ -24,6 +24,14 @@ const swaggerDefinition: OAS3Definition = {
       description: "Search DuckDuckGo or discover public company contact emails.",
     },
     {
+      name: "Google Search",
+      description: "Search Google with the same pagination and content-format options.",
+    },
+    {
+      name: "Yelp Search",
+      description: "Search Yelp businesses with optional contact, review, and enrichment extraction.",
+    },
+    {
       name: "Crawl",
       description: "Fetch and optionally execute JavaScript on any page URL.",
     },
@@ -208,6 +216,100 @@ const swaggerDefinition: OAS3Definition = {
           content: { type: "string", example: "<html><body>...</body></html>" },
         },
         required: ["query", "limit", "region", "responseType", "nextCursor", "content"],
+      },
+      YelpReview: {
+        type: "object",
+        properties: {
+          author: { type: "string", nullable: true, example: "Jane D." },
+          rating: { type: "number", nullable: true, example: 5 },
+          text: { type: "string", nullable: true, example: "Fast response and great work." },
+          date: { type: "string", nullable: true, example: "2026-04-01" },
+        },
+      },
+      YelpContact: {
+        type: "object",
+        properties: {
+          phone: { type: "string", nullable: true, example: "+1 415-555-0100" },
+          address: { type: "string", nullable: true, example: "123 Market St, San Francisco, CA 94103" },
+          website: { type: "string", nullable: true, example: "https://business.example/" },
+        },
+      },
+      YelpEnrichment: {
+        type: "object",
+        properties: {
+          email: { type: "string", nullable: true, example: "hello@business.example" },
+          website: { type: "string", nullable: true, example: "https://business.example/" },
+        },
+      },
+      YelpResult: {
+        type: "object",
+        properties: {
+          name: { type: "string", example: "Example Handyman" },
+          url: { type: "string", example: "https://www.yelp.com/biz/example-handyman-san-francisco" },
+          contact: {
+            allOf: [{ $ref: "#/components/schemas/YelpContact" }],
+            nullable: true,
+          },
+          reviews: {
+            type: "array",
+            nullable: true,
+            items: { $ref: "#/components/schemas/YelpReview" },
+          },
+          enrichment: {
+            allOf: [{ $ref: "#/components/schemas/YelpEnrichment" }],
+            nullable: true,
+          },
+        },
+        required: ["name", "url"],
+      },
+      YelpSearchData: {
+        type: "object",
+        properties: {
+          query: { type: "string", example: "Handyman" },
+          location: { type: "string", example: "San Francisco, CA" },
+          limit: { type: "integer", example: 10 },
+          responseType: { type: "string", example: "json" },
+          nextCursor: { type: "string", nullable: true, example: "eyJvZmZzZXQiOjEwfQ" },
+          count: { type: "integer", example: 2 },
+          includeReviews: { type: "boolean", example: true },
+          includeContact: { type: "boolean", example: true },
+          enrichment: {
+            type: "object",
+            properties: {
+              findEmail: { type: "boolean", example: true },
+              findWebsite: { type: "boolean", example: true },
+            },
+            required: ["findEmail", "findWebsite"],
+          },
+          results: {
+            type: "array",
+            items: { $ref: "#/components/schemas/YelpResult" },
+          },
+        },
+        required: [
+          "query",
+          "location",
+          "limit",
+          "responseType",
+          "nextCursor",
+          "count",
+          "includeReviews",
+          "includeContact",
+          "enrichment",
+          "results",
+        ],
+      },
+      YelpSearchContentData: {
+        type: "object",
+        properties: {
+          query: { type: "string", example: "Handyman" },
+          location: { type: "string", example: "San Francisco, CA" },
+          limit: { type: "integer", example: 10 },
+          responseType: { type: "string", enum: ["html", "markdown", "txt"], example: "markdown" },
+          nextCursor: { type: "string", nullable: true, example: "eyJvZmZzZXQiOjEwfQ" },
+          content: { type: "string", example: "1. [Example Handyman](https://www.yelp.com/biz/...)" },
+        },
+        required: ["query", "location", "limit", "responseType", "nextCursor", "content"],
       },
       CompanyContactEmail: {
         type: "object",
@@ -1368,6 +1470,508 @@ const swaggerDefinition: OAS3Definition = {
           },
           "403": {
             description: "The crawl endpoint is not available on the free tier, or custom proxy requires a valid x-api-token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "429": {
+            description: "Too many requests.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ErrorResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/RateLimitErrorData" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal server error.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/search/google": {
+      get: {
+        tags: ["Google Search"],
+        summary: "Search Google with query parameters",
+        security: [{ apiTokenAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "query",
+            required: true,
+            schema: { type: "string" },
+            description: "Search text to send to Google.",
+          },
+          {
+            in: "query",
+            name: "limit",
+            required: false,
+            schema: { type: "integer", default: 10, minimum: 1, maximum: 50 },
+            description: "Maximum number of results to return.",
+          },
+          {
+            in: "query",
+            name: "region",
+            required: false,
+            schema: { type: "string", example: "us-en" },
+            description: "Google locale in gl-hl form, for example us-en, uk-en, pk-en.",
+          },
+          {
+            in: "query",
+            name: "cursor",
+            required: false,
+            schema: { type: "string" },
+            description: "Opaque cursor from a previous response for fetching the next page.",
+          },
+          {
+            in: "query",
+            name: "response_type",
+            required: false,
+            schema: { type: "string", enum: ["json", "html", "markdown", "txt"], default: "json" },
+            description: "Response format. json returns structured results. html, markdown, and txt return formatted content.",
+          },
+          {
+            in: "header",
+            name: "x-api-token",
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Optional API token. No token = free tier. Valid token = auth or paid tier depending on the user subscription.",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Search completed successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          oneOf: [
+                            { $ref: "#/components/schemas/DuckDuckGoSearchData" },
+                            { $ref: "#/components/schemas/DuckDuckGoSearchContentData" },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid request data.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "401": {
+            description: "Invalid x-api-token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "429": {
+            description: "Too many requests.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ErrorResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/RateLimitErrorData" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal server error.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["Google Search"],
+        summary: "Search Google with a JSON body",
+        security: [{ apiTokenAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "limit",
+            required: false,
+            schema: { type: "integer", default: 10, minimum: 1, maximum: 50 },
+            description: "Optional fallback limit in the query string.",
+          },
+          {
+            in: "query",
+            name: "region",
+            required: false,
+            schema: { type: "string", example: "us-en" },
+            description: "Optional fallback locale in the query string.",
+          },
+          {
+            in: "header",
+            name: "x-api-token",
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Optional API token. No token = free tier. Valid token = auth or paid tier depending on the user subscription.",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  query: { type: "string", example: "openai" },
+                  limit: { type: "integer", example: 10 },
+                  region: { type: "string", example: "us-en" },
+                  cursor: { type: "string" },
+                  response_type: { type: "string", enum: ["json", "html", "markdown", "txt"], example: "json" },
+                  proxy: { $ref: "#/components/schemas/ProxyConfig" },
+                },
+                required: ["query"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Search completed successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          oneOf: [
+                            { $ref: "#/components/schemas/DuckDuckGoSearchData" },
+                            { $ref: "#/components/schemas/DuckDuckGoSearchContentData" },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid request data.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "401": {
+            description: "Invalid x-api-token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "403": {
+            description: "Custom proxy requires a valid x-api-token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "429": {
+            description: "Too many requests.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ErrorResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/RateLimitErrorData" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal server error.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/search/yelp": {
+      get: {
+        tags: ["Yelp Search"],
+        summary: "Search Yelp with query parameters",
+        security: [{ apiTokenAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "query",
+            required: true,
+            schema: { type: "string" },
+            description: "Business or service category to search for.",
+          },
+          {
+            in: "query",
+            name: "location",
+            required: true,
+            schema: { type: "string" },
+            description: "Yelp location, for example San Francisco, CA.",
+          },
+          {
+            in: "query",
+            name: "limit",
+            required: false,
+            schema: { type: "integer", default: 10, minimum: 1, maximum: 50 },
+            description: "Maximum number of results to return.",
+          },
+          {
+            in: "query",
+            name: "cursor",
+            required: false,
+            schema: { type: "string" },
+            description: "Opaque cursor from a previous response for fetching the next page.",
+          },
+          {
+            in: "query",
+            name: "include_reviews",
+            required: false,
+            schema: { type: "boolean", default: false },
+            description: "Include up to five parsed reviews from each business page.",
+          },
+          {
+            in: "query",
+            name: "include_contact",
+            required: false,
+            schema: { type: "boolean", default: false },
+            description: "Include parsed contact details from each business page.",
+          },
+          {
+            in: "query",
+            name: "find_email",
+            required: false,
+            schema: { type: "boolean", default: false },
+            description: "Attempt to extract a public email from each Yelp business page.",
+          },
+          {
+            in: "query",
+            name: "find_website",
+            required: false,
+            schema: { type: "boolean", default: false },
+            description: "Attempt to resolve the external website from each Yelp business page.",
+          },
+          {
+            in: "query",
+            name: "response_type",
+            required: false,
+            schema: { type: "string", enum: ["json", "html", "markdown", "txt"], default: "json" },
+            description: "Response format. json returns structured results. html, markdown, and txt return formatted content.",
+          },
+          {
+            in: "header",
+            name: "x-api-token",
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Optional API token. No token = free tier. Valid token = auth or paid tier depending on the user subscription.",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Search completed successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          oneOf: [
+                            { $ref: "#/components/schemas/YelpSearchData" },
+                            { $ref: "#/components/schemas/YelpSearchContentData" },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid request data.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "401": {
+            description: "Invalid x-api-token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "429": {
+            description: "Too many requests.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ErrorResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/RateLimitErrorData" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal server error.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["Yelp Search"],
+        summary: "Search Yelp with a JSON body",
+        security: [{ apiTokenAuth: [] }],
+        parameters: [
+          {
+            in: "header",
+            name: "x-api-token",
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Optional API token. No token = free tier. Valid token = auth or paid tier depending on the user subscription.",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  query: { type: "string", example: "Handyman" },
+                  location: { type: "string", example: "San Francisco, CA" },
+                  limit: { type: "integer", example: 10 },
+                  cursor: { type: "string" },
+                  include_reviews: { type: "boolean", example: true },
+                  include_contact: { type: "boolean", example: true },
+                  find_email: { type: "boolean", example: true },
+                  find_website: { type: "boolean", example: true },
+                  response_type: { type: "string", enum: ["json", "html", "markdown", "txt"], example: "json" },
+                  proxy: { $ref: "#/components/schemas/ProxyConfig" },
+                },
+                required: ["query", "location"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Search completed successfully.",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/ApiResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          oneOf: [
+                            { $ref: "#/components/schemas/YelpSearchData" },
+                            { $ref: "#/components/schemas/YelpSearchContentData" },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid request data.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "401": {
+            description: "Invalid x-api-token.",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "403": {
+            description: "Custom proxy requires a valid x-api-token.",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
